@@ -7,8 +7,8 @@ const MathLitP1Nov2022 = ({ paperId }) => {
     const [totalQuestions, setTotalQuestions] = useState(0);
     const [showFeedback, setShowFeedback] = useState({});
     const resultsRef = useRef(null);
-    const [recording, setRecording] = useState(false);
-    const [recordError, setRecordError] = useState(null);
+    const [setRecording] = useState(false);
+    const [setRecordError] = useState(null);
 
     useEffect(() => {
         const questionElements = document.querySelectorAll('.input-group input[data-answer]');

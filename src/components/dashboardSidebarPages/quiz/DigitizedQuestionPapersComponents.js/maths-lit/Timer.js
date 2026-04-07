@@ -2,7 +2,7 @@ import React from 'react'
 import { useTimer } from './TimerContext'
 
 const Timer = () => {
-    const { timeLeft, isRunning, isTimeUp, formatTime } = useTimer()
+    const { timeLeft, isTimeUp, formatTime } = useTimer()
 
     const getTimerColor = () => {
         if (timeLeft <= 300) return 'timer-critical' // 5 minutes or less

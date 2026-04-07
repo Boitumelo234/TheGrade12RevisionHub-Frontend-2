@@ -16,8 +16,8 @@ import MathematicsP1Nov2023Eng
     from "../components/dashboardSidebarPages/quiz/DigitizedQuestionPapersComponents.js/maths/paper1Nov2023/MathematicsP1Nov2023Eng";
 import MathLitP2Nov2020
     from "../components/dashboardSidebarPages/quiz/DigitizedQuestionPapersComponents.js/maths-lit/paper2Nov/MathLitP2Nov2020";
-import MathLitP1Nov2022
-    from "../components/dashboardSidebarPages/quiz/DigitizedQuestionPapersComponents.js/maths-lit/paper1Nov/MathLitP1Nov2022";
+// import MathLitP1Nov2022
+//     from "../components/dashboardSidebarPages/quiz/DigitizedQuestionPapersComponents.js/maths-lit/paper1Nov/MathLitP1Nov2022";
 import catPaper2_2020
     from "../components/dashboardSidebarPages/quiz/DigitizedQuestionPapersComponents.js/CAT/2020/Paper2/catPaper2_2020";
 import cat2020Paper1
@@ -76,8 +76,8 @@ import One
     from "../components/dashboardSidebarPages/quiz/DigitizedQuestionPapersComponents.js/LifeOrientation/2021/One";
 import TechnicalMathematicsP1Nov2023Eng
     from "../components/dashboardSidebarPages/quiz/DigitizedQuestionPapersComponents.js/Technical-Maths/2023/Paper1/TechnicalMathematicsP1Nov2023Eng";
-import TechnicalMathematicsP2Nov2023Eng
-    from "../components/dashboardSidebarPages/quiz/DigitizedQuestionPapersComponents.js/Technical-Maths/2023/Paper2/TechnicalMathematicsP2Nov2023Eng";
+// import TechnicalMathematicsP2Nov2023Eng
+//     from "../components/dashboardSidebarPages/quiz/DigitizedQuestionPapersComponents.js/Technical-Maths/2023/Paper2/TechnicalMathematicsP2Nov2023Eng";
 import TechnicalMathematicsP1Nov2024Eng
     from "../components/dashboardSidebarPages/quiz/DigitizedQuestionPapersComponents.js/Technical-Maths/2024/Paper1/TechnicalMathematicsP1Nov2024Eng";
 import TechnicalMathematicsP2Nov2024Eng
@@ -150,22 +150,22 @@ import TechnicalMathematicsP1Nov2021
     from "../components/dashboardSidebarPages/quiz/DigitizedQuestionPapersComponents.js/Technical-Maths/2021/TechnicalMathematicsP1Nov2021";
 import EconomicsP2Nov2022Eng
     from "../components/dashboardSidebarPages/quiz/DigitizedQuestionPapersComponents.js/Economics/2022/EconomicsP2Nov2022Eng";
-import MathLitP12021
-    from "../components/dashboardSidebarPages/quiz/DigitizedQuestionPapersComponents.js/maths-lit/MathLitP12021";
-import MathLitP22021
-    from "../components/dashboardSidebarPages/quiz/DigitizedQuestionPapersComponents.js/maths-lit/MathLitP22021";
-import MathLitP12022
-    from "../components/dashboardSidebarPages/quiz/DigitizedQuestionPapersComponents.js/maths-lit/MathLitP12022";
-import MathLitP22022
-    from "../components/dashboardSidebarPages/quiz/DigitizedQuestionPapersComponents.js/maths-lit/MathLitP22022";
-import MathLitP12023
-    from "../components/dashboardSidebarPages/quiz/DigitizedQuestionPapersComponents.js/maths-lit/MathLitP12023";
-import MathLitP22023
-    from "../components/dashboardSidebarPages/quiz/DigitizedQuestionPapersComponents.js/maths-lit/MathLitP22023";
-import MathLitP12024
-    from "../components/dashboardSidebarPages/quiz/DigitizedQuestionPapersComponents.js/maths-lit/MathLitP12024";
-import MathLitP22024
-    from "../components/dashboardSidebarPages/quiz/DigitizedQuestionPapersComponents.js/maths-lit/MathLitP22024";
+// import MathLitP12021
+//     from "../components/dashboardSidebarPages/quiz/DigitizedQuestionPapersComponents.js/maths-lit/MathLitP12021";
+// import MathLitP22021
+//     from "../components/dashboardSidebarPages/quiz/DigitizedQuestionPapersComponents.js/maths-lit/MathLitP22021";
+// import MathLitP12022
+//     from "../components/dashboardSidebarPages/quiz/DigitizedQuestionPapersComponents.js/maths-lit/MathLitP12022";
+// import MathLitP22022
+//     from "../components/dashboardSidebarPages/quiz/DigitizedQuestionPapersComponents.js/maths-lit/MathLitP22022";
+// import MathLitP12023
+//     from "../components/dashboardSidebarPages/quiz/DigitizedQuestionPapersComponents.js/maths-lit/MathLitP12023";
+// import MathLitP22023
+//     from "../components/dashboardSidebarPages/quiz/DigitizedQuestionPapersComponents.js/maths-lit/MathLitP22023";
+// import MathLitP12024
+//     from "../components/dashboardSidebarPages/quiz/DigitizedQuestionPapersComponents.js/maths-lit/MathLitP12024";
+// import MathLitP22024
+//     from "../components/dashboardSidebarPages/quiz/DigitizedQuestionPapersComponents.js/maths-lit/MathLitP22024";
 
 
 
