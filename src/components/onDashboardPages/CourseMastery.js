@@ -1,79 +1,54 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import PropTypes from 'prop-types';
+import { Eye } from 'lucide-react';
 
-const CourseMastery = ({ enrolledSubjects, darkMode, courses }) => {
-    const [sortBy, setSortBy] = useState('score');
-    const [sortOrder, setSortOrder] = useState('desc');
-    const [searchTerm, setSearchTerm] = useState('');
+const CourseMastery = ({ enrolledSubjects, courses }) => {
+    const subjects = useMemo(() => (
+        [...courses]
+            .filter((course) => enrolledSubjects.includes(course.name))
+            .sort((a, b) => b.progress - a.progress)
+    ), [courses, enrolledSubjects]);
 
-    const sortedCourses = useMemo(() => {
-        let result = [...courses].filter(course => enrolledSubjects.includes(course.name));
-        if (searchTerm) {
-            result = result.filter((course) =>
-                course.name.toLowerCase().includes(searchTerm.toLowerCase())
-            );
-        }
-        result.sort((a, b) => {
-            const order = sortOrder === 'asc' ? 1 : -1;
-            return sortBy === 'score'
-                ? (a.progress - b.progress) * order
-                : a.name.localeCompare(b.name) * order;
-        });
-        return result;
-    }, [courses, sortBy, sortOrder, searchTerm, enrolledSubjects]);
+    const getSubjectIcon = (name) => {
+        const key = name.toLowerCase();
+        if (key.includes('math')) return '\uD83D\uDCD0';
+        if (key.includes('physical') || key.includes('science')) return '\uD83D\uDD2C';
+        if (key.includes('english')) return '\uD83D\uDCDA';
+        if (key.includes('life')) return '\uD83E\uDDEC';
+        return '\uD83D\uDCD8';
+    };
 
     return (
-        <div className="bg-[var(--bg-secondary)] bg-opacity-90 backdrop-blur-md p-6 rounded-2xl shadow-2xl h-[500px] flex flex-col">
-            <h2 className="text-xl font-semibold mb-4 text-[var(--text-primary)] text-center">Subject Mastery</h2>
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-4">
-                <input
-                    type="text"
-                    placeholder="Search courses..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="px-4 py-3 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] focus:border-[var(--accent-primary)] bg-[var(--bg-secondary)] text-[var(--text-primary)] w-full sm:w-1/2"
-                    aria-label="Search subject"
-                />
-                <div className="flex items-center gap-2">
-                    <select
-                        value={sortBy}
-                        onChange={(e) => setSortBy(e.target.value)}
-                        className="px-4 py-3 border border-[var(--border)] rounded-lg focus:ring-2 focus:ring-[var(--accent-primary)] bg-[var(--bg-secondary)] text-[var(--text-primary)]"
-                        aria-label="Sort by"
-                    >
-                        <option value="score">Score</option>
-                        <option value="name">Name</option>
-                    </select>
-                    <button
-                        onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-                        className="px-4 py-3 bg-[var(--bg-tertiary)] text-[var(--text-primary)] rounded-lg hover:bg-[var(--hover-tertiary)] whitespace-nowrap"
-                        aria-label={`Sort order: ${sortOrder === 'asc' ? 'ascending' : 'descending'}`}
-                    >
-                        {sortOrder === 'asc' ? '↑ Asc' : '↓ Desc'}
-                    </button>
-                </div>
+        <div className="rounded-2xl border border-[color:rgba(237,237,238,0.9)] bg-[var(--bg-secondary)] p-6 shadow-sm">
+            <div className="mb-2 flex items-center gap-2">
+                <Eye className="h-5 w-5 text-[var(--text-secondary)]" />
+                <span className="font-semibold text-[var(--text-primary)]">Subject Progress</span>
             </div>
-            <div className="flex-1 space-y-4 overflow-y-auto">
-                {sortedCourses.length > 0 ? (
-                    sortedCourses.map((course) => (
-                        <div key={course.name} className="flex items-center space-x-4">
-                            <div className="w-1/3 text-[var(--text-primary)]">{course.name}</div>
-                            <div className="w-2/3">
-                                <div className="bg-[var(--border)] rounded-full h-4">
-                                    <div
-                                        className="bg-[var(--accent-primary)] h-4 rounded-full transition-all duration-500"
-                                        style={{ width: `${Math.round(course.progress)}%` }}
-                                    ></div>
-                                </div>
-                                <span className="text-sm text-[var(--text-secondary)]">
-                                    {Math.round(course.progress)}%
-                                </span>
+            <p className="mb-6 text-sm text-[var(--text-secondary)]">Track your mastery in each subject</p>
+
+            <div className="space-y-4">
+                {subjects.length > 0 ? subjects.map((subject) => (
+                    <div key={subject.name} className="space-y-2">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <span className="text-lg">{getSubjectIcon(subject.name)}</span>
+                                <span className="text-sm font-medium text-[var(--text-primary)]">{subject.name}</span>
                             </div>
+                            <span className="text-sm font-semibold text-[var(--accent-primary)]">{Math.round(subject.progress)}%</span>
                         </div>
-                    ))
-                ) : (
-                    <div className="text-center py-10 text-[var(--text-normal)]">
-                        No activity completed yet
+                        <div className="h-2 overflow-hidden rounded-full bg-[color:rgba(243,244,246,1)]">
+                            <div
+                                className="h-full rounded-full transition-all duration-500"
+                                style={{
+                                    width: `${Math.round(subject.progress)}%`,
+                                    background: 'linear-gradient(90deg, var(--accent-primary), rgba(22,163,74,0.7))',
+                                }}
+                            />
+                        </div>
+                    </div>
+                )) : (
+                    <div className="rounded-xl bg-[color:rgba(243,244,246,0.7)] p-6 text-center">
+                        <p className="text-sm text-[var(--text-secondary)]">No activity completed yet</p>
                     </div>
                 )}
             </div>
@@ -83,7 +58,6 @@ const CourseMastery = ({ enrolledSubjects, darkMode, courses }) => {
 
 CourseMastery.propTypes = {
     enrolledSubjects: PropTypes.arrayOf(PropTypes.string).isRequired,
-    darkMode: PropTypes.bool.isRequired,
     courses: PropTypes.arrayOf(
         PropTypes.shape({
             name: PropTypes.string.isRequired,

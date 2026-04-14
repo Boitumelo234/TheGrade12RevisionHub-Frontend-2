@@ -2,11 +2,83 @@
 @tailwind components;
 @tailwind utilities;
 
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@100..900&display=swap');
+
+:root {
+  --background: oklch(0.97 0.005 250);
+  --foreground: oklch(0.2 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.2 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.2 0 0);
+  --primary: oklch(0.65 0.2 145);
+  --primary-foreground: oklch(1 0 0);
+  --secondary: oklch(0.97 0.01 300);
+  --secondary-foreground: oklch(0.4 0.15 300);
+  --muted: oklch(0.96 0 0);
+  --muted-foreground: oklch(0.5 0 0);
+  --accent: oklch(0.75 0.15 300);
+  --accent-foreground: oklch(0.35 0.15 300);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(1 0 0);
+  --border: oklch(0.93 0 0);
+  --input: oklch(0.93 0 0);
+  --ring: oklch(0.65 0.2 145);
+  --radius: 1rem;
+
+  --text-primary: #111827;
+  --text-secondary: #6b7280;
+  --bg-primary: #f8fafc;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #f3f4f6;
+  --hover-tertiary: #e5e7eb;
+  --accent-primary: #22c55e;
+  --accent-secondary: #c084fc;
+  --hover-primary: #16a34a;
+  --hover-secondary: #a855f7;
+}
+
+[data-theme='dark'] {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.145 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.145 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.985 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.396 0.141 25.723);
+  --destructive-foreground: oklch(0.985 0 0);
+  --border: oklch(0.269 0 0);
+  --input: oklch(0.269 0 0);
+  --ring: oklch(0.439 0 0);
+
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --bg-primary: #0f172a;
+  --bg-secondary: #111827;
+  --bg-tertiary: #1f2937;
+  --hover-tertiary: #334155;
+  --accent-primary: #22c55e;
+  --accent-secondary: #c084fc;
+  --hover-primary: #16a34a;
+  --hover-secondary: #a855f7;
+}
+
 body {
-  font-family: 'Inter', sans-serif;
+  font-family: 'Geist', 'Inter', sans-serif;
   margin: 0;
   padding: 0;
-  /*background: linear-gradient(to bottom right, #134e4a, #7f1d1d); !* Match section background *!*/
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 .form-input {
@@ -16,33 +88,12 @@ body {
   transition: all 0.2s ease;
 }
 
-@keyframes slideUp {
-  0% { transform: translateY(100%); opacity: 0; }    /* Start: bottom, invisible */
-  6.7% { transform: translateY(0); opacity: 1; }     /* Appearance: fade in and move to position */
-  56.2% { transform: translateY(0); opacity: 1; }    /* Stay visible for reading */
-  62.9% { transform: translateY(-100%); opacity: 0; } /* Disappearance: fade out and move up */
-  100% { transform: translateY(-100%); opacity: 0; }  /* Stay invisible for pause */
-}
-
-.service-card {
-  animation: slideUp 8.08s infinite;
-  width: 100%;
-}
-
-.service-card:nth-child(2) {
-  animation-delay: 0.5s;
-}
-
-.service-card:nth-child(3) {
-  animation-delay: 1s;
-}
-
 footer {
   background: #1a4543;
   padding: 15px 0 0 0;
   margin: 0;
   text-align: center;
-  font-family: 'Inter', sans-serif;
+  font-family: 'Geist', 'Inter', sans-serif;
   width: 100%;
 }
 
@@ -110,25 +161,6 @@ pre {
   }
 }
 
-:root {
-  --text-primary: #1f2937;
-  --bg-primary: #ffffff;
-  --bg-secondary: #f9fafb; /* Very light gray in light mode */
-  --bg-tertiary: #e5e7eb;
-  --hover-tertiary: #d1d5db;
-  --accent-primary: #3b82f6;
-  --accent-secondary: #8b5cf6;
-  --hover-primary: #2563eb;
-  --hover-secondary: #7c3aed;
-}
-[data-theme='dark'] {
-  --text-primary: #f3f4f6;
-  --bg-primary: #1f2937;
-  --bg-secondary: #374151; /* Dark gray in dark mode */
-  --bg-tertiary: #4b5563;
-  --hover-tertiary: #6b7280;
-  --accent-primary: #60a5fa;
-  --accent-secondary: #a78bfa;
-  --hover-primary: #3b82f6;
-  --hover-secondary: #8b5cf6;
+* {
+  box-sizing: border-box;
 }

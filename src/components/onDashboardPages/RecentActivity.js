@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import PropTypes from 'prop-types';
+import { Clock, Download, Trash2 } from 'lucide-react';
 import ConfirmationModal from '../dashboardSidebarPages/chatroom/ConfirmationModal';
 
 const RecentActivity = ({ activities, setActivities, API_BASE_URL }) => {
@@ -7,57 +8,39 @@ const RecentActivity = ({ activities, setActivities, API_BASE_URL }) => {
 
     const handleDeleteAll = async () => {
         try {
-            const headers = {
-                Authorization: `Bearer ${sessionStorage.getItem('jwt')}`,
-                'Content-Type': 'application/json',
-            };
             const response = await fetch(`${API_BASE_URL}/api/user/activities`, {
                 method: 'DELETE',
-                headers,
+                headers: {
+                    Authorization: `Bearer ${sessionStorage.getItem('jwt')}`,
+                    'Content-Type': 'application/json',
+                },
             });
             const data = await response.json();
             if (response.ok && data.success) {
                 setActivities([]);
-                setModalState({
-                    isOpen: true,
-                    type: 'result',
-                    title: 'Success',
-                    message: 'All activities deleted successfully',
-                });
+                setModalState({ isOpen: true, type: 'result', title: 'Success', message: 'All activities deleted successfully' });
             } else {
-                setModalState({
-                    isOpen: true,
-                    type: 'result',
-                    title: 'Error',
-                    message: data.message || 'Failed to delete activities',
-                });
+                setModalState({ isOpen: true, type: 'result', title: 'Error', message: data.message || 'Failed to delete activities' });
             }
         } catch (error) {
-            setModalState({
-                isOpen: true,
-                type: 'result',
-                title: 'Error',
-                message: 'Failed to delete activities: ' + error.message,
-            });
+            setModalState({ isOpen: true, type: 'result', title: 'Error', message: `Failed to delete activities: ${error.message}` });
         }
     };
 
     const handleDownload = () => {
-        // Convert activities to CSV format
-        const headers = ['ID,Description,Date'];
-        const rows = activities.map(activity => [
-            activity.id,
-            `"${activity.description.replace(/"/g, '""')}"`, // Escape quotes in description
-            new Date(activity.date).toLocaleString(),
-        ].join(','));
-        const csvContent = [headers, ...rows].join('\n');
-
-        // Create a Blob and trigger download
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const csvLines = [
+            'ID,Description,Date',
+            ...activities.map((activity) => [
+                activity.id,
+                `"${activity.description.replace(/"/g, '""')}"`,
+                new Date(activity.date).toLocaleString(),
+            ].join(',')),
+        ];
+        const blob = new Blob([csvLines.join('\n')], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
-        link.setAttribute('href', url);
-        link.setAttribute('download', 'recent_activities.csv');
+        link.href = url;
+        link.download = 'recent_activities.csv';
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -65,7 +48,7 @@ const RecentActivity = ({ activities, setActivities, API_BASE_URL }) => {
     };
 
     return (
-        <div className="bg-[var(--bg-secondary)] bg-opacity-90 backdrop-blur-md p-6 rounded-2xl shadow-2xl">
+        <div className="rounded-2xl border border-[color:rgba(237,237,238,0.9)] bg-[var(--bg-secondary)] p-4 shadow-sm">
             <ConfirmationModal
                 isOpen={modalState.isOpen}
                 onClose={() => setModalState({ isOpen: false, type: '', message: '', title: '' })}
@@ -73,81 +56,47 @@ const RecentActivity = ({ activities, setActivities, API_BASE_URL }) => {
                 title={modalState.title}
                 message={modalState.message}
             />
-            <div className="flex items-center justify-between mb-4">
-                {activities.length > 0 && (
-                    <button
-                        className="text-[var(--text-secondary)] hover:text-blue-500 transition"
-                        onClick={handleDownload}
-                        aria-label="Download all activities"
-                    >
-                        <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="h-5 w-5"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                        >
-                            <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                            />
-                        </svg>
-                    </button>
-                )}
-                <h2 className="text-xl font-semibold text-[var(--text-primary)] flex-1 text-center">Recent Activity</h2>
-                {activities.length > 0 && (
-                    <button
-                        className="text-[var(--text-secondary)] hover:text-red-500 transition"
-                        onClick={() =>
-                            setModalState({
+
+            <div className="mb-4 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-[var(--accent-secondary)]" />
+                    <span className="text-sm font-semibold text-[var(--text-primary)]">Recent Activity</span>
+                </div>
+                <div className="flex gap-1">
+                    {activities.length > 0 && (
+                        <button className="flex h-7 w-7 items-center justify-center text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]" onClick={handleDownload} aria-label="Download all activities">
+                            <Download className="h-3.5 w-3.5" />
+                        </button>
+                    )}
+                    {activities.length > 0 && (
+                        <button
+                            className="flex h-7 w-7 items-center justify-center text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)]"
+                            onClick={() => setModalState({
                                 isOpen: true,
                                 type: 'confirm',
                                 title: 'Confirm Delete',
                                 message: 'Are you sure you want to delete all activities? This action cannot be undone.',
-                            })
-                        }
-                        aria-label="Delete all activities"
-                    >
-                        <svg
-                            className="w-5 h-5"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                            xmlns="http://www.w3.org/2000/svg"
+                            })}
+                            aria-label="Delete all activities"
                         >
-                            <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth="2"
-                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                            />
-                        </svg>
-                    </button>
-                )}
+                            <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                    )}
+                </div>
             </div>
-            <ul className="space-y-2 max-h-80 overflow-y-auto hide-scrollbar">
+
+            <div className="space-y-2">
                 {activities.length > 0 ? (
-                    activities.map((activity) => (
-                        <li
-                            key={activity.id}
-                            className="py-2 px-16 bg-[var(--bg-secondary)] rounded hover:bg-[var(--hover-primary)] transition cursor-pointer flex justify-between items-center"
-                            onClick={() => console.log(`View details for: ${activity.description}`)}
-                            role="button"
-                            tabIndex={0}
-                            onKeyDown={(e) => e.key === 'Enter' && console.log(`View details for: ${activity.description}`)}
-                        >
-                            <span className="font-medium text-[var(--text-primary)]">{activity.description}</span>
-                            <span className="text-sm text-[var(--text-secondary)]">
-                                {new Date(activity.date).toLocaleString()}
-                            </span>
-                        </li>
+                    activities.slice(0, 4).map((activity) => (
+                        <div key={activity.id} className="flex items-start justify-between border-b border-[color:rgba(237,237,238,0.9)] py-2 last:border-0">
+                            <p className="truncate pr-2 text-xs font-medium text-[var(--text-primary)]">"{activity.description}"</p>
+                            <p className="ml-2 whitespace-nowrap text-right text-xs text-[var(--text-secondary)]">{new Date(activity.date).toLocaleString()}</p>
+                        </div>
                     ))
                 ) : (
-                    <p className="text-[var(--text-secondary)] text-center">No recent activity.</p>
+                    <p className="text-center text-[var(--text-secondary)]">No recent activity.</p>
                 )}
-            </ul>
+            </div>
         </div>
     );
 };

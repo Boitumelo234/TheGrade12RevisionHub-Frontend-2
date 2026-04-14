@@ -1,60 +1,46 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import PropTypes from 'prop-types';
+import { Bell, Moon, Sun } from 'lucide-react';
 
-const Header = ({ user, notifications, isCollapsed, darkMode, setDarkMode , tabDescription, userMessage}) => {
-    const notificationCount = notifications.filter((n) => !n.read).length;
-    const displayName = user.firstName || user.lastName
-        ? `${user.firstName || ''} ${user.lastName || ''}`.trim()
-        : user.email || 'User';
+const Header = ({ user, notifications, darkMode, setDarkMode, tabDescription, userMessage }) => {
+    const safeNotifications = Array.isArray(notifications) ? notifications : [];
+    const safeUser = user || {};
+    const notificationCount = safeNotifications.filter((notification) => !notification.read).length;
+    const displayName = safeUser.firstName || safeUser.lastName
+        ? `${safeUser.firstName || ''} ${safeUser.lastName || ''}`.trim()
+        : safeUser.email || 'User';
+    const title = tabDescription || 'Student Dashboard';
+    const subtitle = userMessage ? `${userMessage}, ${displayName}!` : `Welcome, ${displayName}!`;
+    const toggleTheme = typeof setDarkMode === 'function' ? () => setDarkMode(!darkMode) : undefined;
 
     return (
-        <div
-            className={`
-                flex-1 min-w-0 p-6 sm:p-8 transition-all duration-300 mx-auto
-                ${isCollapsed ? 'ml-16' : 'ml-64'}
-            `}
-        >
-            {/*Moving the h1*/}
-            <style>{`
-               /* .header-title {
-                    padding-left: clamp(40px, 10vw, 48px); /!* Default padding *!/
-                    transition: padding-left 0.3s ease-in-out; /!* Smooth transition *!/
-                }*/
-                @media (max-width: 639px) {
-                    .header-title {
-                        padding-left: clamp(24px, 6vw, 40px);/*48px, 12vw, 56px*/); /* Shift right to (24px, 6vw, 40px);) clear hamburger */
-                    }
-                }
-            `}</style>
-            <div className="bg-[var(--bg-secondary)] p-6 rounded-2xl shadow-md  flex justify-between items-center">
-                <div>
-                    <h1 className="header-title text-3xl font-bold text-[var(--text-primary)]">{tabDescription}</h1>
-                    <p className="text-sm mt-1 text-[var(--text-secondary)]">{userMessage}, {displayName}!</p>
-                </div>
-                <div className="flex gap-4">
-                    <Link
-                        to="/notifications"
-                        className="relative px-4 py-2 bg-[var(--bg-tertiary)] text-[var(--text-primary)] rounded-lg hover:bg-[var(--hover-tertiary)]"
-                        aria-label={`View notifications (${notificationCount} unread)`}
-                    >
-                        🔔
-                        {notificationCount > 0 && (
-                            <span className="absolute -top-2 -right-2 bg-[var(--accent-secondary)] text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                                        {notificationCount}
-                                    </span>
-                        )}
-                    </Link>
-                    <button
-                        onClick={() => setDarkMode(!darkMode)}
-                        className="px-4 py-2 bg-[var(--bg-tertiary)] text-[var(--text-primary)] rounded-lg hover:bg-[var(--hover-tertiary)]"
-                        aria-label="Toggle dark mode"
-                    >
-                        {darkMode ? '☀️ Light Mode' : '🌙 Dark Mode'}
-                    </button>
-                </div>
+        <header className="mb-8 flex items-center justify-between pl-12 lg:pl-0">
+            <div>
+                <h1 className="text-2xl font-bold text-[var(--text-primary)] lg:text-3xl">{title}</h1>
+                <p className="mt-1 text-[var(--text-secondary)]">{subtitle}</p>
             </div>
-        </div>
+            <div className="flex items-center gap-2">
+                <Link to="/notifications" className="relative rounded-xl p-2" aria-label={`View notifications (${notificationCount} unread)`}>
+                    <Bell className="h-5 w-5 text-[var(--text-primary)]" />
+                    {notificationCount > 0 && (
+                        <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs text-white">
+                            {notificationCount}
+                        </span>
+                    )}
+                </Link>
+                <button
+                    type="button"
+                    onClick={toggleTheme}
+                    className="hidden items-center gap-2 rounded-xl border border-[rgba(229,231,235,0.9)] bg-[var(--bg-secondary)] px-4 py-2.5 text-sm font-medium text-[var(--text-primary)] sm:flex"
+                    aria-label="Toggle dark mode"
+                    disabled={!toggleTheme}
+                >
+                    {darkMode ? <Sun className="h-4 w-4 text-amber-500" /> : <Moon className="h-4 w-4 text-slate-600" />}
+                    <span>{darkMode ? 'Light Mode' : 'Dark Mode'}</span>
+                </button>
+            </div>
+        </header>
     );
 };
 
@@ -63,22 +49,26 @@ Header.propTypes = {
         firstName: PropTypes.string,
         lastName: PropTypes.string,
         email: PropTypes.string,
-        title: PropTypes.string,
-        profilePicture: PropTypes.string,
-    }).isRequired,
+    }),
     notifications: PropTypes.arrayOf(
         PropTypes.shape({
             id: PropTypes.number.isRequired,
-            message: PropTypes.string.isRequired,
-            date: PropTypes.string.isRequired,
             read: PropTypes.bool.isRequired,
         })
-    ).isRequired,
-    isCollapsed: PropTypes.bool.isRequired,
-    darkMode: PropTypes.bool.isRequired,
-    setDarkMode: PropTypes.func.isRequired,
-    tabDescription: PropTypes.string.isRequired,
-    userMessage: PropTypes.string.isRequired,
+    ),
+    darkMode: PropTypes.bool,
+    setDarkMode: PropTypes.func,
+    tabDescription: PropTypes.string,
+    userMessage: PropTypes.string,
+};
+
+Header.defaultProps = {
+    user: null,
+    notifications: [],
+    darkMode: false,
+    setDarkMode: undefined,
+    tabDescription: 'Student Dashboard',
+    userMessage: 'Welcome',
 };
 
 export default Header;

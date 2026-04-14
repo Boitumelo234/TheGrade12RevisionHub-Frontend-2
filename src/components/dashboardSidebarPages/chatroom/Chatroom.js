@@ -1,16 +1,15 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PropTypes from 'prop-types';
 import { Client } from '@stomp/stompjs';
 import SockJS from 'sockjs-client';
-import Sidebar from '../../common/Sidebar';
 import { v4 as uuidv4 } from 'uuid';
-import { FiEye, FiSend, FiTrash2, FiUser } from 'react-icons/fi';
+import { Eye, Plus, Send, Trash2, Users } from 'lucide-react';
+import Sidebar from '../../common/Sidebar';
 import GroupUsersModal from './GroupUsersModal';
 import ConfirmationModal from './ConfirmationModal';
-import Header from "../../common/Header";
 
-const Chatroom = ({ user, isCollapsed = true, setIsCollapsed, darkMode, setDarkMode, notifications, setNotifications }) => {
+const Chatroom = ({ user, isCollapsed = true, setIsCollapsed, darkMode, notifications, onActivity }) => {
     const navigate = useNavigate();
     const [messages, setMessages] = useState([]);
     const [newMessage, setNewMessage] = useState('');
@@ -32,82 +31,74 @@ const Chatroom = ({ user, isCollapsed = true, setIsCollapsed, darkMode, setDarkM
     const [groupUsers, setGroupUsers] = useState([]);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [groupToDelete, setGroupToDelete] = useState(null);
-    const [showSidebar, setShowSidebar] = useState(false);
-    const sidebarRef = useRef(null);
 
-    const isAdmin = (groupId) => {
-        const group = groups.find((g) => g.id === groupId);
-        return group && user && group.creatorId === user.id;
-    };
+    const isAdmin = useCallback(
+        (groupId) => {
+            const group = groups.find((item) => item.id === groupId);
+            return Boolean(group && user && group.creatorId === user.id);
+        },
+        [groups, user]
+    );
 
     useEffect(() => {
         document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light');
     }, [darkMode]);
 
-    useEffect(() => {
-        const handleClickOutside = (e) => {
-            if (showSidebar && sidebarRef.current && !sidebarRef.current.contains(e.target) && !e.target.closest('.hamburger')) {
-                setShowSidebar(false);
-            }
-        };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [showSidebar]);
+    const formatDate = (dateString, timeZone = 'Africa/Johannesburg') => {
+        if (!dateString || typeof dateString !== 'string') return 'Unknown Date';
+        const date = new Date(dateString);
+        if (Number.isNaN(date.getTime())) return 'Invalid Date';
+        return date.toLocaleString('en-US', {
+            timeZone,
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true,
+        });
+    };
 
-    useEffect(() => {
-        if (window.innerWidth <= 639) {
-            setIsCollapsed(!showSidebar);
+    const fetchUsers = useCallback(async (query = '') => {
+        try {
+            const token = sessionStorage.getItem('jwt');
+            const url = query.trim()
+                ? `http://localhost:6262/api/user/chat/users/search?query=${encodeURIComponent(query)}`
+                : 'http://localhost:6262/api/user/chat/users';
+
+            const response = await fetch(url, {
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`,
+                },
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+            }
+
+            const data = await response.json();
+            setUsers(data.map((item) => ({ ...item, id: Number(item.id) })));
+        } catch (fetchError) {
+            setError(`Failed to fetch users: ${fetchError.message}`);
         }
-    }, [showSidebar, setIsCollapsed]);
-
-    const fetchUsers = useCallback(
-        async (query = '', type = 'private') => {
-            try {
-                const token = sessionStorage.getItem('jwt');
-                const url = query.trim()
-                    ? `http://localhost:6262/api/user/chat/users/search?query=${encodeURIComponent(query)}`
-                    : 'http://localhost:6262/api/user/chat/users';
-                const response = await fetch(url, {
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`,
-                    },
-                });
-                if (response.ok) {
-                    const data = await response.json();
-                    const userList = data.map((u) => ({
-                        ...u,
-                        id: Number(u.id),
-                    }));
-                    setUsers(userList);
-                    console.log(`Fetched users for ${type}:`, userList);
-                } else {
-                    throw new Error(`HTTP ${response.status}: ${await response.text()}`);
-                }
-            } catch (error) {
-                console.error('Fetch users error:', error);
-                setError('Failed to fetch users: ' + error.message);
-            }
-        },
-        []
-    );
+    }, []);
 
     useEffect(() => {
-        const delayDebounceFn = setTimeout(() => {
+        const timer = setTimeout(() => {
             if (user) {
-                fetchUsers(privateSearchQuery, 'private');
+                fetchUsers(privateSearchQuery);
             }
         }, 300);
-        return () => clearTimeout(delayDebounceFn);
+        return () => clearTimeout(timer);
     }, [privateSearchQuery, user, fetchUsers]);
 
     useEffect(() => {
-        const delayDebounceFn = setTimeout(() => {
+        const timer = setTimeout(() => {
             if (user) {
-                fetchUsers(createGroupSearchQuery, 'createGroup');
+                fetchUsers(createGroupSearchQuery);
             }
         }, 300);
-        return () => clearTimeout(delayDebounceFn);
+        return () => clearTimeout(timer);
     }, [createGroupSearchQuery, user, fetchUsers]);
 
     useEffect(() => {
@@ -118,57 +109,57 @@ const Chatroom = ({ user, isCollapsed = true, setIsCollapsed, darkMode, setDarkM
                 const response = await fetch('http://localhost:6262/api/user/chat/groups', {
                     headers: {
                         'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`,
+                        Authorization: `Bearer ${token}`,
                     },
                 });
-                if (response.ok) {
-                    const data = await response.json();
-                    console.log('Fetched groups:', data);
-                    setGroups(
-                        data.map((g) => ({
-                            ...g,
-                            id: Number(g.id),
-                            creatorId: Number(g.creatorId),
-                        }))
-                    );
-                } else {
+
+                if (!response.ok) {
                     throw new Error(`HTTP ${response.status}: ${await response.text()}`);
                 }
-            } catch (error) {
-                console.error('Fetch groups error:', error);
-                setError('Failed to fetch groups: ' + error.message);
+
+                const data = await response.json();
+                setGroups(
+                    data.map((item) => ({
+                        ...item,
+                        id: Number(item.id),
+                        creatorId: Number(item.creatorId),
+                    }))
+                );
+            } catch (fetchError) {
+                setError(`Failed to fetch groups: ${fetchError.message}`);
             }
         };
+
         fetchGroups();
     }, [user]);
 
-    const fetchGroupUsers = async (groupId) => {
+    const fetchGroupUsers = useCallback(async (groupId) => {
         try {
             const token = sessionStorage.getItem('jwt');
             const response = await fetch(`http://localhost:6262/api/user/chat/group/${groupId}/users`, {
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`,
+                    Authorization: `Bearer ${token}`,
                 },
             });
-            if (response.ok) {
-                const data = await response.json();
-                const group = groups.find((g) => g.id === groupId);
-                setGroupUsers(
-                    data.map((u) => ({
-                        ...u,
-                        id: Number(u.id),
-                        isAdmin: group && Number(u.id) === group.creatorId,
-                    }))
-                );
-            } else {
+
+            if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${await response.text()}`);
             }
-        } catch (error) {
-            console.error('Fetch group users error:', error);
-            setError('Failed to fetch group users: ' + error.message);
+
+            const data = await response.json();
+            const group = groups.find((item) => item.id === groupId);
+            setGroupUsers(
+                data.map((item) => ({
+                    ...item,
+                    id: Number(item.id),
+                    isAdmin: group && Number(item.id) === group.creatorId,
+                }))
+            );
+        } catch (fetchError) {
+            setError(`Failed to fetch group users: ${fetchError.message}`);
         }
-    };
+    }, [groups]);
 
     useEffect(() => {
         const fetchMessages = async () => {
@@ -177,78 +168,61 @@ const Chatroom = ({ user, isCollapsed = true, setIsCollapsed, darkMode, setDarkM
             try {
                 const token = sessionStorage.getItem('jwt');
                 let url;
+
                 if (chatMode === 'group') {
                     url = selectedGroupId
                         ? `http://localhost:6262/api/user/chat/group/${selectedGroupId}`
-                        : `http://localhost:6262/api/user/chat/group`;
+                        : 'http://localhost:6262/api/user/chat/group';
                 } else if (chatMode === 'private' && selectedUserId) {
                     url = `http://localhost:6262/api/user/chat/private/${selectedUserId}`;
                 } else {
                     setMessages([]);
+                    setLoading(false);
                     return;
                 }
+
                 const response = await fetch(url, {
                     headers: {
                         'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`,
+                        Authorization: `Bearer ${token}`,
                     },
                 });
-                if (response.ok) {
-                    const data = await response.json();
-                    setMessages(
-                        data
-                            .map((msg) => ({
-                                ...msg,
-                                senderId: Number(msg.senderId),
-                                recipientId: msg.recipientId ? Number(msg.recipientId) : null,
-                                groupId: msg.groupId ? Number(msg.groupId) : null,
-                                timestamp: formatDate(msg.createdAt),
-                            }))
-                            .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-                    );
-                } else {
+
+                if (!response.ok) {
                     throw new Error(`HTTP ${response.status}: ${await response.text()}`);
                 }
-            } catch (error) {
-                console.error('Fetch messages error:', error);
-                setError('Failed to fetch messages: ' + error.message);
+
+                const data = await response.json();
+                setMessages(
+                    data
+                        .map((item) => ({
+                            ...item,
+                            senderId: Number(item.senderId),
+                            recipientId: item.recipientId ? Number(item.recipientId) : null,
+                            groupId: item.groupId ? Number(item.groupId) : null,
+                            timestamp: formatDate(item.createdAt),
+                        }))
+                        .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
+                );
+            } catch (fetchError) {
+                setError(`Failed to fetch messages: ${fetchError.message}`);
             } finally {
                 setLoading(false);
             }
         };
+
         fetchMessages();
     }, [user, chatMode, selectedUserId, selectedGroupId]);
-
-    const formatDate = (dateString, timeZone = 'Africa/Johannesburg') => {
-        if (!dateString || typeof dateString !== 'string') {
-            console.warn('Invalid date string:', dateString);
-            return 'Unknown Date';
-        }
-        const date = new Date(dateString);
-        if (isNaN(date.getTime())) {
-            console.warn('Invalid date:', dateString);
-            return 'Invalid Date';
-        }
-        const formatted = date.toLocaleString('en-US', {
-            timeZone,
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: true,
-        });
-        console.log(`Raw: ${dateString}, UTC: ${date.toISOString()}, Formatted: ${formatted} (TimeZone: ${timeZone})`);
-        return formatted;
-    };
 
     const updateMessagesWithServerResponse = useCallback((data) => {
         setMessages((prev) => {
             const existingIndex = prev.findIndex(
-                (msg) => msg.tempId && msg.content === data.content && msg.senderId === Number(data.senderId)
+                (item) => item.tempId && item.content === data.content && item.senderId === Number(data.senderId)
             );
+
             if (existingIndex !== -1) {
-                const updatedMessages = [...prev];
-                updatedMessages[existingIndex] = {
+                const updated = [...prev];
+                updated[existingIndex] = {
                     ...data,
                     senderId: Number(data.senderId),
                     recipientId: data.recipientId ? Number(data.recipientId) : null,
@@ -256,8 +230,10 @@ const Chatroom = ({ user, isCollapsed = true, setIsCollapsed, darkMode, setDarkM
                     timestamp: formatDate(data.createdAt),
                     id: data.id || uuidv4(),
                 };
-                return updatedMessages.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-            } else if (!prev.some((msg) => msg.id === data.id)) {
+                return updated.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+            }
+
+            if (!prev.some((item) => item.id === data.id)) {
                 return [
                     ...prev,
                     {
@@ -268,23 +244,25 @@ const Chatroom = ({ user, isCollapsed = true, setIsCollapsed, darkMode, setDarkM
                         timestamp: formatDate(data.createdAt),
                         id: data.id || uuidv4(),
                     },
-                ].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+                ].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
             }
-            return prev.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+            return prev;
         });
     }, []);
 
     const updateGroupUsersWithServerResponse = useCallback((data) => {
         setGroupUsers(
-            data.users.map((u) => ({
-                ...u,
-                id: Number(u.id),
+            data.users.map((item) => ({
+                ...item,
+                id: Number(item.id),
             }))
         );
     }, []);
 
     useEffect(() => {
         if (!user || stompClientRef.current) return;
+
         const socket = new SockJS('http://localhost:6262/ws');
         const client = new Client({
             webSocketFactory: () => socket,
@@ -293,34 +271,30 @@ const Chatroom = ({ user, isCollapsed = true, setIsCollapsed, darkMode, setDarkM
                 Authorization: `Bearer ${sessionStorage.getItem('jwt')}`,
             },
             onConnect: () => {
-                console.log('WebSocket connected for user:', user.email);
                 stompClientRef.current = client;
                 setStompClient(client);
+
                 client.subscribe('/topic/group', (message) => {
-                    console.log('Received group message:', message.body);
                     if (chatMode === 'group' && !selectedGroupId) {
-                        const data = JSON.parse(message.body);
-                        updateMessagesWithServerResponse(data);
+                        updateMessagesWithServerResponse(JSON.parse(message.body));
                     }
                 });
-                groups.forEach(group => {
+
+                groups.forEach((group) => {
                     client.subscribe(`/topic/group/${group.id}`, (message) => {
-                        console.log(`Received group message for group ${group.id}:`, message.body);
                         if (chatMode === 'group' && selectedGroupId === group.id) {
-                            const data = JSON.parse(message.body);
-                            updateMessagesWithServerResponse(data);
+                            updateMessagesWithServerResponse(JSON.parse(message.body));
                         }
                     });
+
                     client.subscribe(`/topic/group/${group.id}/users`, (message) => {
-                        console.log(`Received group users update for group ${group.id}:`, message.body);
                         if (editGroupId === group.id) {
-                            const data = JSON.parse(message.body);
-                            updateGroupUsersWithServerResponse(data);
+                            updateGroupUsersWithServerResponse(JSON.parse(message.body));
                         }
                     });
                 });
+
                 client.subscribe(`/user/${user.id}/queue/message`, (message) => {
-                    console.log('Received private message:', message.body);
                     if (chatMode === 'private' && selectedUserId) {
                         const data = JSON.parse(message.body);
                         if (
@@ -333,33 +307,23 @@ const Chatroom = ({ user, isCollapsed = true, setIsCollapsed, darkMode, setDarkM
                 });
             },
             onStompError: (frame) => {
-                console.error('WebSocket error:', frame);
-                setError('WebSocket connection failed: ' + (frame.body || frame));
+                setError(`WebSocket connection failed: ${frame.body || frame}`);
             },
             onWebSocketClose: () => {
-                console.log('WebSocket closed');
                 stompClientRef.current = null;
                 setStompClient(null);
             },
         });
+
         client.activate();
+
         return () => {
             if (stompClientRef.current) {
                 client.deactivate();
-                console.log('WebSocket disconnected');
                 stompClientRef.current = null;
             }
         };
-    }, [
-        user,
-        groups,
-        chatMode,
-        selectedUserId,
-        selectedGroupId,
-        editGroupId,
-        updateMessagesWithServerResponse,
-        updateGroupUsersWithServerResponse,
-    ]);
+    }, [user, groups, chatMode, selectedUserId, selectedGroupId, editGroupId, updateMessagesWithServerResponse, updateGroupUsersWithServerResponse]);
 
     const handleAddUser = async (userId) => {
         try {
@@ -368,32 +332,29 @@ const Chatroom = ({ user, isCollapsed = true, setIsCollapsed, darkMode, setDarkM
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`,
+                    Authorization: `Bearer ${token}`,
                 },
                 body: JSON.stringify({ userId: Number(userId) }),
             });
-            if (response.ok) {
-                const userToAdd = users.find((u) => u.id === Number(userId));
-                if (userToAdd) {
-                    const group = groups.find((g) => g.id === editGroupId);
-                    setGroupUsers([...groupUsers, {
-                        ...userToAdd,
-                        isAdmin: group && Number(userToAdd.id) === group.creatorId,
-                    }]);
-                }
-                setError(null);
-                if (stompClient && stompClient.connected) {
-                    stompClient.publish({
-                        destination: `/app/group/${editGroupId}/users`,
-                        body: JSON.stringify({ users: [...groupUsers, userToAdd] }),
-                    });
-                }
-            } else {
+
+            if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${await response.text()}`);
             }
-        } catch (error) {
-            console.error('Add user error:', error);
-            setError('Failed to add user: ' + error.message);
+
+            const userToAdd = users.find((item) => item.id === Number(userId));
+            if (userToAdd) {
+                const group = groups.find((item) => item.id === editGroupId);
+                setGroupUsers((prev) => [
+                    ...prev,
+                    {
+                        ...userToAdd,
+                        isAdmin: group && Number(userToAdd.id) === group.creatorId,
+                    },
+                ]);
+            }
+            setError(null);
+        } catch (fetchError) {
+            setError(`Failed to add user: ${fetchError.message}`);
         }
     };
 
@@ -406,21 +367,15 @@ const Chatroom = ({ user, isCollapsed = true, setIsCollapsed, darkMode, setDarkM
                     Authorization: `Bearer ${token}`,
                 },
             });
-            if (response.ok) {
-                setGroupUsers(groupUsers.filter((u) => u.id !== userId));
-                setError(null);
-                if (stompClient && stompClient.connected) {
-                    stompClient.publish({
-                        destination: `/app/group/${editGroupId}/users`,
-                        body: JSON.stringify({ users: groupUsers.filter((u) => u.id !== userId) }),
-                    });
-                }
-            } else {
+
+            if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${await response.text()}`);
             }
-        } catch (error) {
-            console.error('Remove user error:', error);
-            setError('Failed to remove user: ' + error.message);
+
+            setGroupUsers((prev) => prev.filter((item) => item.id !== userId));
+            setError(null);
+        } catch (fetchError) {
+            setError(`Failed to remove user: ${fetchError.message}`);
         }
     };
 
@@ -441,6 +396,7 @@ const Chatroom = ({ user, isCollapsed = true, setIsCollapsed, darkMode, setDarkM
             setError('Select a user for private chat');
             return;
         }
+
         const tempId = uuidv4();
         const message = {
             senderId: Number(user.id),
@@ -451,12 +407,18 @@ const Chatroom = ({ user, isCollapsed = true, setIsCollapsed, darkMode, setDarkM
             createdAt: new Date().toISOString(),
             tempId,
         };
+
         try {
             stompClient.publish({
                 destination:
-                    chatMode === 'private' ? '/app/chat/private' : selectedGroupId ? `/app/chat/group/${selectedGroupId}` : '/app/chat/group',
+                    chatMode === 'private'
+                        ? '/app/chat/private'
+                        : selectedGroupId
+                            ? `/app/chat/group/${selectedGroupId}`
+                            : '/app/chat/group',
                 body: JSON.stringify(message),
             });
+
             setMessages((prev) => [
                 ...prev,
                 {
@@ -467,11 +429,11 @@ const Chatroom = ({ user, isCollapsed = true, setIsCollapsed, darkMode, setDarkM
                     timestamp: formatDate(message.createdAt),
                     id: tempId,
                 },
-            ].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
+            ]);
             setNewMessage('');
-        } catch (error) {
-            console.error('Send message error:', error);
-            setError('Failed to send message: ' + error.message);
+            setError(null);
+        } catch (sendError) {
+            setError(`Failed to send message: ${sendError.message}`);
         }
     };
 
@@ -484,33 +446,35 @@ const Chatroom = ({ user, isCollapsed = true, setIsCollapsed, darkMode, setDarkM
             setError('At least one member is required');
             return;
         }
+
         try {
             const token = sessionStorage.getItem('jwt');
             const response = await fetch('http://localhost:6262/api/user/chat/group', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`,
+                    Authorization: `Bearer ${token}`,
                 },
                 body: JSON.stringify({
                     name: groupName,
                     memberIds: selectedMemberIds,
                 }),
             });
-            if (response.ok) {
-                const data = await response.json();
-                setGroups([...groups, { id: Number(data.id), name: data.name, creatorId: Number(user.id) }]);
-                setGroupName('');
-                setSelectedMemberIds([]);
-                setCreateGroupSearchQuery('');
-                setSelectedGroupId(Number(data.id));
-                setError(null);
-            } else {
+
+            if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${await response.text()}`);
             }
-        } catch (error) {
-            console.error('Create group error:', error);
-            setError('Failed to create group: ' + error.message);
+
+            const data = await response.json();
+            setGroups((prev) => [...prev, { id: Number(data.id), name: data.name, creatorId: Number(user.id) }]);
+            setGroupName('');
+            setSelectedMemberIds([]);
+            setCreateGroupSearchQuery('');
+            setSelectedGroupId(Number(data.id));
+            setChatMode('group');
+            setError(null);
+        } catch (fetchError) {
+            setError(`Failed to create group: ${fetchError.message}`);
         }
     };
 
@@ -519,29 +483,30 @@ const Chatroom = ({ user, isCollapsed = true, setIsCollapsed, darkMode, setDarkM
             setError('Group name is required');
             return;
         }
+
         try {
             const token = sessionStorage.getItem('jwt');
             const response = await fetch(`http://localhost:6262/api/user/chat/group/${editGroupId}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`,
+                    Authorization: `Bearer ${token}`,
                 },
                 body: JSON.stringify({ name: editGroupName }),
             });
-            if (response.ok) {
-                const data = await response.json();
-                setGroups(groups.map((g) => (g.id === editGroupId ? { ...g, name: data.name } : g)));
-                setEditGroupId(null);
-                setEditGroupName('');
-                setGroupUsers([]);
-                setError(null);
-            } else {
+
+            if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${await response.text()}`);
             }
-        } catch (error) {
-            console.error('Edit group error:', error);
-            setError('Failed to edit group: ' + error.message);
+
+            const data = await response.json();
+            setGroups((prev) => prev.map((item) => (item.id === editGroupId ? { ...item, name: data.name } : item)));
+            setEditGroupId(null);
+            setEditGroupName('');
+            setGroupUsers([]);
+            setError(null);
+        } catch (fetchError) {
+            setError(`Failed to edit group: ${fetchError.message}`);
         }
     };
 
@@ -554,20 +519,26 @@ const Chatroom = ({ user, isCollapsed = true, setIsCollapsed, darkMode, setDarkM
                     Authorization: `Bearer ${token}`,
                 },
             });
-            if (response.ok) {
-                setGroups(groups.filter((g) => g.id !== groupId));
-                if (selectedGroupId === groupId) {
-                    setSelectedGroupId(null);
-                    setMessages([]);
-                }
-                setError(null);
-            } else {
+
+            if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${await response.text()}`);
             }
-        } catch (error) {
-            console.error('Delete group error:', error);
-            setError('Failed to delete group: ' + error.message);
+
+            setGroups((prev) => prev.filter((item) => item.id !== groupId));
+            if (selectedGroupId === groupId) {
+                setSelectedGroupId(null);
+                setMessages([]);
+            }
+            setError(null);
+        } catch (fetchError) {
+            setError(`Failed to delete group: ${fetchError.message}`);
         }
+    };
+
+    const toggleMember = (userId) => {
+        setSelectedMemberIds((prev) =>
+            prev.includes(userId) ? prev.filter((item) => item !== userId) : [...prev, userId]
+        );
     };
 
     const openDeleteModal = (groupId) => {
@@ -583,20 +554,9 @@ const Chatroom = ({ user, isCollapsed = true, setIsCollapsed, darkMode, setDarkM
         }
     };
 
-    const closeModal = () => {
-        setIsModalOpen(false);
-        setGroupToDelete(null);
-    };
-
-    const toggleMember = (userId) => {
-        setSelectedMemberIds((prev) =>
-            prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
-        );
-    };
-
     const getSenderName = (senderId) => {
         if (senderId === user.id) return 'You';
-        const sender = users.find((u) => u.id === senderId);
+        const sender = users.find((item) => item.id === senderId);
         return sender ? `${sender.firstName} ${sender.lastName}` : `User ${senderId}`;
     };
 
@@ -605,577 +565,429 @@ const Chatroom = ({ user, isCollapsed = true, setIsCollapsed, darkMode, setDarkM
         navigate('/login');
     };
 
-    if (loading || !user) {
+    const filteredPrivateUsers = useMemo(() => {
+        const query = privateSearchQuery.trim().toLowerCase();
+        if (!query) return users;
+        return users.filter((item) =>
+            `${item.firstName || ''} ${item.lastName || ''} ${item.email || ''}`.toLowerCase().includes(query)
+        );
+    }, [users, privateSearchQuery]);
+
+    const createGroupCandidates = useMemo(() => {
+        const query = createGroupSearchQuery.trim().toLowerCase();
+        const available = users.filter((item) => item.id !== user?.id);
+        if (!query) return available;
+        return available.filter((item) =>
+            `${item.firstName || ''} ${item.lastName || ''} ${item.email || ''}`.toLowerCase().includes(query)
+        );
+    }, [users, createGroupSearchQuery, user?.id]);
+
+    if (loading && !user) {
         return (
-            <div className="full">
-                <div className="flex min-h-screen bg-[var(--bg-primary)] justify-center items-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[var(--accent-primary)]"></div>
-                </div>
+            <div className="flex min-h-screen items-center justify-center bg-[var(--bg-primary)]">
+                <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-t-2 border-[var(--accent-primary)]" />
             </div>
         );
     }
 
+    const tabs = [
+        { id: 'group', label: 'Group Chats' },
+        { id: 'private', label: 'Private Chat' },
+        { id: 'createGroup', label: 'Manage Groups' },
+    ];
+
     return (
-        <div className="full">
-            <div className="flex min-h-screen bg-[var(--bg-primary)] relative">
-                <style>{`
-                    :root {
-                        --bg-primary: ${darkMode ? '#111827' : '#f4f4f4'};
-                        --bg-secondary: ${darkMode ? '#1f2937' : '#ffffff'};
-                        --bg-tertiary: ${darkMode ? '#374151' : '#f3f4f6'};
-                        --text-primary: ${darkMode ? '#f3f4f6' : '#1f2937'};
-                        --text-secondary: ${darkMode ? '#d1d5db' : '#6b7280'};
-                        --accent-primary: #4FD1C5;
-                        --accent-secondary: #ef4444;
-                        --hover-primary: #3CB7AB;
-                        --hover-tertiary: ${darkMode ? '#4b5563' : '#e5e7eb'};
-                        --border-color: ${darkMode ? '#4b5563' : '#e5e7eb'};
-                        --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
-                    }
+        <div className="flex min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)]">
+            <Sidebar
+                user={user}
+                onLogout={handleLogout}
+                isCollapsed={isCollapsed}
+                setIsCollapsed={setIsCollapsed}
+                onActivity={onActivity}
+            />
 
-                    .full {
-                        width: 100%;
-                        min-height: 100vh;
-                        position: relative;
-                        z-index: 10;
-                    }
+            <main className={`flex-1 overflow-hidden px-4 pb-8 pt-20 transition-all duration-300 lg:pt-8 ${isCollapsed ? 'lg:ml-20' : 'lg:ml-64'}`}>
+                <div className="mx-auto flex h-[calc(100vh-3rem)] max-w-7xl flex-col overflow-hidden rounded-3xl border border-[rgba(229,231,235,0.5)] bg-[var(--bg-secondary)] shadow-sm">
+                    <div className="border-b border-[rgba(229,231,235,0.5)] px-8 py-8">
+                        <h1 className="text-4xl font-bold text-[var(--text-primary)]">Chatroom</h1>
+                        <p className="mt-2 text-[var(--text-secondary)]">
+                            Connect with peers, {user?.firstName || user?.email || 'Student'}!
+                        </p>
+                    </div>
 
-                    .chat-section {
-                        background: ${darkMode
-                    ? 'linear-gradient(135deg, #1f2937 0%, #111827 100%)'
-                    : 'linear-gradient(135deg, #ffffff 0%, #f9fafb 100%)'};
-                        border-radius: 12px;
-                        box-shadow: var(--shadow);
-                        padding: 24px;
-                        height: calc(100vh - 80px);
-                        display: flex;
-                        flex-direction: column;
-                    }
+                    <div className="border-b border-[rgba(229,231,235,0.5)] px-8 py-4">
+                        <div className="flex flex-wrap gap-3">
+                            {tabs.map((tab) => (
+                                <button
+                                    key={tab.id}
+                                    type="button"
+                                    onClick={() => {
+                                        setChatMode(tab.id);
+                                        setError(null);
+                                    }}
+                                    className={`rounded-xl px-6 py-2.5 text-sm font-medium transition ${
+                                        chatMode === tab.id
+                                            ? 'bg-[var(--accent-primary)] text-white'
+                                            : 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] hover:opacity-90'
+                                    }`}
+                                >
+                                    {tab.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
 
-                    .message-container {
-                        flex: 1;
-                        overflow-y: auto;
-                        padding: 16px;
-                        border-radius: 8px;
-                        background-color: var(--bg-secondary);
-                        margin-bottom: 16px;
-                    }
+                    {error && (
+                        <div className="mx-8 mt-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                            {error}
+                        </div>
+                    )}
 
-                    .message-container::-webkit-scrollbar {
-                        width: 6px;
-                    }
-
-                    .message-container::-webkit-scrollbar-thumb {
-                        background-color: var(--border-color);
-                        border-radius: 3px;
-                    }
-
-                    .message-container::-webkit-scrollbar-track {
-                        background-color: var(--bg-secondary);
-                    }
-
-                    .message {
-                        margin-bottom: 12px;
-                        padding: 12px 16px;
-                        border-radius: 12px;
-                        max-width: 75%;
-                        word-break: break-word;
-                        animation: fadeIn 0.3s ease-in;
-                    }
-
-                    .message.sent {
-                        background-color: var(--accent-primary);
-                        color: white;
-                        margin-left: auto;
-                    }
-
-                    .message.received {
-                        background-color: var(--bg-tertiary);
-                        color: var(--text-primary);
-                    }
-
-                    @keyframes fadeIn {
-                        from { opacity: 0; transform: translateY(10px); }
-                        to { opacity: 1; transform: translateY(0); }
-                    }
-
-                    .form-input {
-                        width: 100%;
-                        padding: 10px;
-                        border: 1px solid var(--border-color);
-                        border-radius: 8px;
-                        background-color: var(--bg-secondary);
-                        color: var(--text-primary);
-                        font-size: 0.875rem;
-                        transition: border-color 0.2s ease, box-shadow 0.2s ease;
-                    }
-
-                    .form-input:focus {
-                        border-color: var(--accent-primary);
-                        box-shadow: 0 0 0 3px rgba(79, 209, 197, 0.1);
-                        outline: none;
-                    }
-
-                    .btn-primary {
-                        background-color: var(--accent-primary);
-                        color: white;
-                        padding: 10px 16px;
-                        border-radius: 8px;
-                        border: none;
-                        cursor: pointer;
-                        font-size: 0.875rem;
-                        font-weight: 500;
-                        transition: background-color 0.2s ease;
-                        display: inline-flex;
-                        align-items: center;
-                        justify-content: center;
-                    }
-
-                    .btn-primary:hover {
-                        background-color: var(--hover-primary);
-                    }
-
-                    .btn-secondary {
-                        background-color: var(--bg-tertiary);
-                        color: var(--text-primary);
-                        padding: 10px 16px;
-                        border-radius: 8px;
-                        border: none;
-                        cursor: pointer;
-                        font-size: 0.875rem;
-                        font-weight: 500;
-                        transition: background-color 0.2s ease;
-                        display: inline-flex;
-                        align-items: center;
-                        justify-content: center;
-                    }
-
-                    .btn-secondary:hover {
-                        background-color: var(--hover-tertiary);
-                    }
-
-                    .hamburger {
-                        display: none;
-                        cursor: pointer;
-                        background: none;
-                        border: none;
-                        padding: clamp(6px, 1.5vw, 8px);
-                        position: fixed;
-                        top: clamp(12px, 3vw, 16px);
-                        left: clamp(12px, 3vw, 16px);
-                        z-index: 50;
-                        transition: left 0.3s ease-in-out;
-                    }
-
-                    .sidebar-wrapper {
-                        position: fixed;
-                        top: 0;
-                        left: 0;
-                        height: 100vh;
-                        z-index: 40;
-                        transition: transform 0.3s ease-in-out;
-                    }
-
-                    .sidebar-hidden {
-                        transform: translateX(-100%);
-                    }
-
-                    .dashboard-content {
-                        max-height: 80vh;
-                        overflow-y: auto;
-                        padding-right: clamp(6px, 1.5vw, 8px);
-                    }
-
-                    .dashboard-content::-webkit-scrollbar {
-                        width: 6px;
-                    }
-
-                    .dashboard-content::-webkit-scrollbar-thumb {
-                        background-color: var(--border-color);
-                        border-radius: 3px;
-                    }
-
-                    .dashboard-content::-webkit-scrollbar-track {
-                        background-color: var(--bg-secondary);
-                    }
-
-                    @media (max-width: 639px) {
-                        .hamburger {
-                            display: block;
-                            left: ${showSidebar ? 'clamp(192px, 48vw, 198px)' : 'clamp(12px, 3vw, 16px)'};
-                        }
-
-                        .sidebar-wrapper {
-                            display: ${showSidebar ? 'block' : 'none'};
-                        }
-
-                        .chat-section {
-                            padding: 16px;
-                            height: calc(100vh - 64px);
-                        }
-
-                        .message {
-                            max-width: 85%;
-                        }
-
-                        .header h1 {
-                            padding-left: clamp(48px, 12vw, 56px);
-                        }
-
-                        .sidebar-open .header h1 {
-                            padding-left: clamp(208px, 50vw, 216px);
-                        }
-
-                        .sidebar-open .dashboard-content {
-                            margin-left: clamp(192px, 48vw, 198px);
-                        }
-
-                        .ml-16, .ml-64 {
-                            margin-left: 0;
-                        }
-                    }
-
-                    @media (min-width: 640px) {
-                        .hamburger {
-                            display: none;
-                        }
-
-                        .sidebar-wrapper {
-                            display: block;
-                        }
-                    }
-                `}</style>
-
-                <button
-                    className="hamburger"
-                    onClick={() => {
-                        setShowSidebar(!showSidebar);
-                        if (!showSidebar) setIsCollapsed(false);
-                    }}
-                    aria-label="Toggle sidebar"
-                >
-                    <svg className="w-6 h-6 text-[var(--text-primary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16m-7 6h7"></path>
-                    </svg>
-                </button>
-
-                <div ref={sidebarRef} className={`sidebar-wrapper ${!showSidebar ? 'sidebar-hidden' : ''}`}>
-                    <Sidebar
-                        user={user}
-                        onLogout={handleLogout}
-                        isCollapsed={isCollapsed}
-                        setIsCollapsed={setIsCollapsed}
-                        darkMode={darkMode}
-                        disableHamburger={showSidebar && window.innerWidth <= 639}
-                    />
-                </div>
-
-                <div className="flex-1">
-                    <Header
-                        user={user}
-                        notifications={notifications}
-                        setNotifications={setNotifications}
-                        isCollapsed={isCollapsed}
-                        darkMode={darkMode}
-                        setDarkMode={setDarkMode}
-                        tabDescription="Chatroom"
-                        userMessage="Connect with peers"
-                        className="header"
-                    />
-                    <div className={`flex-1 min-w-0 p-4 sm:p-6 transition-all duration-300 ${isCollapsed ? 'ml-16' : 'ml-64'} dashboard-content ${showSidebar ? 'sidebar-open' : ''}`}>
-                        <div className="chat-section">
-                            <div className="flex items-center gap-3 mb-6">
-                                {['group', 'private', 'createGroup'].map((mode) => (
-                                    <button
-                                        key={mode}
-                                        onClick={() => {
-                                            setChatMode(mode);
-                                            if (mode === 'group') setSelectedUserId(null);
-                                            if (mode === 'private') setSelectedGroupId(null);
-                                            setPrivateSearchQuery('');
-                                            setCreateGroupSearchQuery('');
-                                            setMessages([]);
-                                        }}
-                                        className={`px-4 py-2 rounded-lg font-medium text-sm sm:text-base transition-all duration-200 ${
-                                            chatMode === mode
-                                                ? 'bg-[var(--accent-primary)] text-white'
-                                                : 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] hover:bg-[var(--hover-tertiary)]'
-                                        }`}
-                                    >
-                                        {mode === 'group' && 'Group Chats'}
-                                        {mode === 'private' && 'Private Chat'}
-                                        {mode === 'createGroup' && 'Manage Groups'}
-                                    </button>
-                                ))}
+                    {chatMode === 'group' && (
+                        <div className="flex min-h-0 flex-1 flex-col">
+                            <div className="border-b border-[rgba(229,231,235,0.5)] px-8 py-4">
+                                <select
+                                    value={selectedGroupId || ''}
+                                    onChange={(event) => setSelectedGroupId(event.target.value ? Number(event.target.value) : null)}
+                                    className="w-full max-w-sm rounded-xl border border-[rgba(229,231,235,0.9)] bg-[var(--bg-primary)] px-4 py-3 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
+                                >
+                                    <option value="">Main Group Chat</option>
+                                    {groups.map((group) => (
+                                        <option key={group.id} value={group.id}>
+                                            {group.name}
+                                        </option>
+                                    ))}
+                                </select>
                             </div>
 
-                            {error && (
-                                <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-lg text-sm">
-                                    {error}
-                                </div>
-                            )}
-
-                            {chatMode === 'group' && (
-                                <div className="flex flex-col flex-1">
-                                    <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Group Chats</h2>
-                                    <select
-                                        value={selectedGroupId || ''}
-                                        onChange={(e) => {
-                                            setSelectedGroupId(Number(e.target.value) || null);
-                                            setMessages([]);
-                                        }}
-                                        className="form-input mb-4"
-                                        disabled={groups.length === 0}
-                                    >
-                                        <option value="">Main Group Chat</option>
-                                        {groups.map((g) => (
-                                            <option key={g.id} value={g.id}>
-                                                {g.name}
-                                            </option>
+                            <div className="flex-1 overflow-y-auto px-8 py-6">
+                                {loading ? (
+                                    <div className="flex h-full items-center justify-center text-sm text-[var(--text-secondary)]">
+                                        Loading messages...
+                                    </div>
+                                ) : messages.length === 0 ? (
+                                    <div className="flex h-full items-center justify-center text-sm text-[var(--text-secondary)]">
+                                        No messages found.
+                                    </div>
+                                ) : (
+                                    <div className="space-y-4">
+                                        {messages.map((message) => (
+                                            <div
+                                                key={message.id}
+                                                className={`max-w-3xl rounded-2xl px-4 py-3 ${
+                                                    Number(message.senderId) === Number(user?.id)
+                                                        ? 'ml-auto bg-[var(--accent-primary)] text-white'
+                                                        : 'bg-[var(--bg-primary)] text-[var(--text-primary)]'
+                                                }`}
+                                            >
+                                                <div className="mb-1 flex items-center justify-between gap-4">
+                                                    <span className="text-xs font-semibold opacity-90">{getSenderName(Number(message.senderId))}</span>
+                                                    <span className="text-[11px] opacity-75">{message.timestamp}</span>
+                                                </div>
+                                                <p className="text-sm leading-relaxed">{message.content}</p>
+                                            </div>
                                         ))}
-                                    </select>
-                                    <div className="message-container">
-                                        {messages.length > 0 ? (
-                                            messages.map((msg) => (
-                                                <div
-                                                    key={msg.id || msg.tempId}
-                                                    className={`message ${msg.senderId === user.id ? 'sent' : 'received'}`}
-                                                >
-                                                    <div className="flex items-baseline gap-2">
-                                                        <span className="font-semibold text-sm">
-                                                            {getSenderName(msg.senderId)}:
-                                                        </span>
-                                                        <span className="text-sm">{msg.content}</span>
-                                                    </div>
-                                                    <p className="text-xs text-[var(--text-secondary)] mt-1">{msg.timestamp}</p>
-                                                </div>
-                                            ))
-                                        ) : (
-                                            <p className="text-sm text-[var(--text-secondary)] text-center">No messages found.</p>
-                                        )}
                                     </div>
-                                    <div className="flex items-center gap-3 mt-4">
-                                        <input
-                                            type="text"
-                                            value={newMessage}
-                                            onChange={(e) => setNewMessage(e.target.value)}
-                                            placeholder="Type a message..."
-                                            className="form-input flex-1"
-                                            aria-label="Message input"
-                                        />
-                                        <button
-                                            onClick={handleSendMessage}
-                                            className="btn-primary min-w-[44px] min-h-[44px]"
-                                            aria-label="Send message"
-                                        >
-                                            <FiSend className="w-5 h-5" />
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
+                                )}
+                            </div>
 
-                            {chatMode === 'private' && (
-                                <div className="flex flex-col flex-1">
-                                    <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Private Chat</h2>
-                                    <div className="flex flex-col gap-3 mb-4">
-                                        <input
-                                            type="text"
-                                            value={privateSearchQuery}
-                                            onChange={(e) => setPrivateSearchQuery(e.target.value)}
-                                            placeholder="Search users..."
-                                            className="form-input"
-                                            aria-label="Search users"
-                                        />
-                                        <select
-                                            value={selectedUserId || ''}
-                                            onChange={(e) => {
-                                                const userId = e.target.value ? Number(e.target.value) : null;
-                                                setSelectedUserId(userId);
-                                                setMessages([]);
-                                                console.log('Selected user:', userId);
-                                            }}
-                                            className="form-input"
-                                            disabled={users.length === 0}
+                            <div className="border-t border-[rgba(229,231,235,0.5)] px-8 py-6">
+                                <div className="flex gap-3">
+                                    <input
+                                        type="text"
+                                        placeholder="Type a message..."
+                                        value={newMessage}
+                                        onChange={(event) => setNewMessage(event.target.value)}
+                                        onKeyDown={(event) => {
+                                            if (event.key === 'Enter') {
+                                                handleSendMessage();
+                                            }
+                                        }}
+                                        className="flex-1 rounded-xl border border-[rgba(229,231,235,0.9)] bg-[var(--bg-primary)] px-4 py-3 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={handleSendMessage}
+                                        className="rounded-xl bg-[var(--accent-primary)] p-3 text-white transition hover:opacity-90"
+                                    >
+                                        <Send className="h-5 w-5" />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {chatMode === 'private' && (
+                        <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[320px_minmax(0,1fr)]">
+                            <div className="border-b border-r border-[rgba(229,231,235,0.5)] px-6 py-6 lg:border-b-0">
+                                <input
+                                    type="text"
+                                    placeholder="Search users..."
+                                    value={privateSearchQuery}
+                                    onChange={(event) => setPrivateSearchQuery(event.target.value)}
+                                    className="mb-4 w-full rounded-xl border border-[rgba(229,231,235,0.9)] bg-[var(--bg-primary)] px-4 py-3 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
+                                />
+
+                                <div className="max-h-[60vh] space-y-2 overflow-y-auto">
+                                    {filteredPrivateUsers.map((item) => (
+                                        <button
+                                            key={item.id}
+                                            type="button"
+                                            onClick={() => setSelectedUserId(Number(item.id))}
+                                            className={`flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left transition ${
+                                                Number(selectedUserId) === Number(item.id)
+                                                    ? 'bg-[var(--accent-primary)] text-white'
+                                                    : 'bg-[var(--bg-primary)] text-[var(--text-primary)] hover:opacity-90'
+                                            }`}
                                         >
-                                            <option value="">Select a user</option>
-                                            {users.map((u) => (
-                                                <option key={u.id} value={u.id}>
-                                                    {u.firstName} {u.lastName}
-                                                </option>
+                                            <div>
+                                                <p className="font-medium">{`${item.firstName || ''} ${item.lastName || ''}`.trim() || item.email}</p>
+                                                <p className="text-xs opacity-75">{item.email}</p>
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="flex min-h-0 flex-1 flex-col">
+                                <div className="border-b border-[rgba(229,231,235,0.5)] px-8 py-4">
+                                    <p className="text-sm font-medium text-[var(--text-primary)]">
+                                        {selectedUserId
+                                            ? `Private chat with ${getSenderName(Number(selectedUserId))}`
+                                            : 'Select a user to start a private chat.'}
+                                    </p>
+                                </div>
+
+                                <div className="flex-1 overflow-y-auto px-8 py-6">
+                                    {!selectedUserId ? (
+                                        <div className="flex h-full items-center justify-center text-sm text-[var(--text-secondary)]">
+                                            Select a user to start a private chat.
+                                        </div>
+                                    ) : loading ? (
+                                        <div className="flex h-full items-center justify-center text-sm text-[var(--text-secondary)]">
+                                            Loading messages...
+                                        </div>
+                                    ) : messages.length === 0 ? (
+                                        <div className="flex h-full items-center justify-center text-sm text-[var(--text-secondary)]">
+                                            No messages found.
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-4">
+                                            {messages.map((message) => (
+                                                <div
+                                                    key={message.id}
+                                                    className={`max-w-3xl rounded-2xl px-4 py-3 ${
+                                                        Number(message.senderId) === Number(user?.id)
+                                                            ? 'ml-auto bg-[var(--accent-primary)] text-white'
+                                                            : 'bg-[var(--bg-primary)] text-[var(--text-primary)]'
+                                                    }`}
+                                                >
+                                                    <div className="mb-1 flex items-center justify-between gap-4">
+                                                        <span className="text-xs font-semibold opacity-90">{getSenderName(Number(message.senderId))}</span>
+                                                        <span className="text-[11px] opacity-75">{message.timestamp}</span>
+                                                    </div>
+                                                    <p className="text-sm leading-relaxed">{message.content}</p>
+                                                </div>
                                             ))}
-                                        </select>
-                                    </div>
-                                    <div className="message-container">
-                                        {messages.length > 0 ? (
-                                            messages.map((msg) => (
-                                                <div
-                                                    key={msg.id || msg.tempId}
-                                                    className={`message ${msg.senderId === user.id ? 'sent' : 'received'}`}
-                                                >
-                                                    <div className="flex items-baseline gap-2">
-                                                        <span className="font-semibold text-sm">
-                                                            {getSenderName(msg.senderId)}:
-                                                        </span>
-                                                        <span className="text-sm">{msg.content}</span>
-                                                    </div>
-                                                    <p className="text-xs text-[var(--text-secondary)] mt-1">{msg.timestamp}</p>
-                                                </div>
-                                            ))
-                                        ) : (
-                                            <p className="text-sm text-[var(--text-secondary)] text-center">No messages yet.</p>
-                                        )}
-                                    </div>
-                                    <div className="flex items-center gap-3 mt-4">
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="border-t border-[rgba(229,231,235,0.5)] px-8 py-6">
+                                    <div className="flex gap-3">
                                         <input
                                             type="text"
-                                            value={newMessage}
-                                            onChange={(e) => setNewMessage(e.target.value)}
                                             placeholder="Type a message..."
-                                            className="form-input flex-1"
-                                            aria-label="Type a message"
-                                            disabled={!selectedUserId}
+                                            value={newMessage}
+                                            onChange={(event) => setNewMessage(event.target.value)}
+                                            onKeyDown={(event) => {
+                                                if (event.key === 'Enter') {
+                                                    handleSendMessage();
+                                                }
+                                            }}
+                                            className="flex-1 rounded-xl border border-[rgba(229,231,235,0.9)] bg-[var(--bg-primary)] px-4 py-3 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
                                         />
                                         <button
+                                            type="button"
                                             onClick={handleSendMessage}
-                                            className="btn-primary min-w-[44px] min-h-[44px] disabled:opacity-50 disabled:cursor-not-allowed"
-                                            disabled={!selectedUserId}
-                                            aria-label="Send message"
+                                            className="rounded-xl bg-[var(--accent-primary)] p-3 text-white transition hover:opacity-90"
                                         >
-                                            <FiSend className="w-5 h-5" />
+                                            <Send className="h-5 w-5" />
                                         </button>
                                     </div>
                                 </div>
-                            )}
+                            </div>
+                        </div>
+                    )}
 
-                            {chatMode === 'createGroup' && (
-                                <div className="flex flex-col flex-1">
-                                    <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Manage Groups</h2>
-                                    <div className="max-h-[300px] overflow-y-auto mb-4">
-                                        {groups.map((g) => (
-                                            <div key={g.id} className="flex items-center justify-between p-3 bg-[var(--bg-tertiary)] rounded-lg mb-2">
-                                                <span className="text-sm font-medium text-[var(--text-primary)] truncate max-w-[200px]">
-                                                    {g.name}
-                                                </span>
-                                                <div className="flex items-center gap-2">
+                    {chatMode === 'createGroup' && (
+                        <div className="grid min-h-0 flex-1 grid-cols-1 gap-6 overflow-y-auto px-8 py-8 lg:grid-cols-[360px_minmax(0,1fr)]">
+                            <div className="rounded-3xl border border-[rgba(229,231,235,0.5)] bg-[var(--bg-primary)] p-6">
+                                <h2 className="mb-2 text-xl font-bold text-[var(--text-primary)]">Create Group</h2>
+                                <p className="mb-6 text-sm text-[var(--text-secondary)]">Create a new group and add members.</p>
+
+                                <input
+                                    type="text"
+                                    placeholder="Group name"
+                                    value={groupName}
+                                    onChange={(event) => setGroupName(event.target.value)}
+                                    className="mb-4 w-full rounded-xl border border-[rgba(229,231,235,0.9)] bg-[var(--bg-secondary)] px-4 py-3 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
+                                />
+
+                                <input
+                                    type="text"
+                                    placeholder="Search members..."
+                                    value={createGroupSearchQuery}
+                                    onChange={(event) => setCreateGroupSearchQuery(event.target.value)}
+                                    className="mb-4 w-full rounded-xl border border-[rgba(229,231,235,0.9)] bg-[var(--bg-secondary)] px-4 py-3 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--accent-primary)]"
+                                />
+
+                                <div className="mb-6 max-h-72 space-y-2 overflow-y-auto">
+                                    {createGroupCandidates.map((item) => (
+                                        <label
+                                            key={item.id}
+                                            className="flex cursor-pointer items-center justify-between rounded-2xl border border-[rgba(229,231,235,0.5)] bg-[var(--bg-secondary)] px-4 py-3"
+                                        >
+                                            <div>
+                                                <p className="font-medium text-[var(--text-primary)]">
+                                                    {`${item.firstName || ''} ${item.lastName || ''}`.trim() || item.email}
+                                                </p>
+                                                <p className="text-xs text-[var(--text-secondary)]">{item.email}</p>
+                                            </div>
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedMemberIds.includes(item.id)}
+                                                onChange={() => toggleMember(item.id)}
+                                                className="h-4 w-4"
+                                            />
+                                        </label>
+                                    ))}
+                                </div>
+
+                                <button
+                                    type="button"
+                                    onClick={handleCreateGroup}
+                                    className="inline-flex items-center gap-2 rounded-xl bg-[var(--accent-primary)] px-5 py-3 text-sm font-medium text-white transition hover:opacity-90"
+                                >
+                                    <Plus className="h-4 w-4" />
+                                    <span>Create Group</span>
+                                </button>
+                            </div>
+
+                            <div className="rounded-3xl border border-[rgba(229,231,235,0.5)] bg-[var(--bg-primary)] p-6">
+                                <div className="mb-6 flex items-center justify-between">
+                                    <div>
+                                        <h2 className="text-xl font-bold text-[var(--text-primary)]">Manage Groups</h2>
+                                        <p className="text-sm text-[var(--text-secondary)]">Edit members, view users, or remove a group.</p>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-3">
+                                    {groups.length === 0 ? (
+                                        <p className="text-sm text-[var(--text-secondary)]">No groups found.</p>
+                                    ) : (
+                                        groups.map((group) => (
+                                            <div
+                                                key={group.id}
+                                                className="flex flex-col gap-4 rounded-2xl border border-[rgba(229,231,235,0.5)] bg-[var(--bg-secondary)] px-5 py-4 md:flex-row md:items-center md:justify-between"
+                                            >
+                                                <div>
+                                                    <p className="font-semibold text-[var(--text-primary)]">{group.name}</p>
+                                                    <p className="text-xs text-[var(--text-secondary)]">
+                                                        {group.creatorId === user?.id ? 'You created this group' : 'Shared group'}
+                                                    </p>
+                                                </div>
+                                                <div className="flex flex-wrap gap-2">
                                                     <button
-                                                        onClick={() => {
-                                                            setEditGroupId(g.id);
-                                                            setEditGroupName(g.name);
-                                                            fetchGroupUsers(g.id);
+                                                        type="button"
+                                                        onClick={async () => {
+                                                            setEditGroupId(group.id);
+                                                            setEditGroupName(group.name);
+                                                            await fetchGroupUsers(group.id);
                                                         }}
-                                                        className="btn-secondary min-w-[40px] min-h-[40px]"
-                                                        aria-label={`View users in group ${g.name}`}
+                                                        className="inline-flex items-center gap-2 rounded-xl bg-[var(--bg-tertiary)] px-4 py-2 text-sm font-medium text-[var(--text-primary)]"
                                                     >
-                                                        {user && g.creatorId === user.id ? (
-                                                            <FiUser className="w-5 h-5" />
-                                                        ) : (
-                                                            <FiEye className="w-5 h-5" />
-                                                        )}
+                                                        <Users className="h-4 w-4" />
+                                                        <span>Manage</span>
                                                     </button>
-                                                    {user && g.creatorId === user.id && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={async () => {
+                                                            setEditGroupId(group.id);
+                                                            setEditGroupName(group.name);
+                                                            await fetchGroupUsers(group.id);
+                                                        }}
+                                                        className="inline-flex items-center gap-2 rounded-xl bg-[var(--bg-tertiary)] px-4 py-2 text-sm font-medium text-[var(--text-primary)]"
+                                                    >
+                                                        <Eye className="h-4 w-4" />
+                                                        <span>View</span>
+                                                    </button>
+                                                    {isAdmin(group.id) && (
                                                         <button
-                                                            onClick={() => openDeleteModal(g.id)}
-                                                            className="btn-secondary min-w-[40px] min-h-[40px] hover:bg-red-500 hover:text-white"
-                                                            aria-label={`Delete group ${g.name}`}
+                                                            type="button"
+                                                            onClick={() => openDeleteModal(group.id)}
+                                                            className="inline-flex items-center gap-2 rounded-xl bg-red-500 px-4 py-2 text-sm font-medium text-white"
                                                         >
-                                                            <FiTrash2 className="w-5 h-5" />
+                                                            <Trash2 className="h-4 w-4" />
+                                                            <span>Delete</span>
                                                         </button>
                                                     )}
                                                 </div>
                                             </div>
-                                        ))}
-                                    </div>
-                                    <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-3">Create New Group</h3>
-                                    <div className="flex flex-col gap-3 mb-4">
-                                        <input
-                                            type="text"
-                                            value={groupName}
-                                            onChange={(e) => setGroupName(e.target.value)}
-                                            placeholder="Enter group name..."
-                                            className="form-input"
-                                            aria-label="Group name"
-                                        />
-                                        <input
-                                            type="text"
-                                            value={createGroupSearchQuery}
-                                            onChange={(e) => setCreateGroupSearchQuery(e.target.value)}
-                                            placeholder="Search users..."
-                                            className="form-input"
-                                            aria-label="Search users"
-                                        />
-                                        {createGroupSearchQuery && (
-                                            <div className="max-h-[200px] overflow-y-auto">
-                                                {users.map((u) => (
-                                                    <div key={u.id} className="flex items-center p-2 border-b border-[var(--border-color)]">
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={selectedMemberIds.includes(u.id)}
-                                                            onChange={() => toggleMember(u.id)}
-                                                            className="mr-3 h-4 w-4"
-                                                            aria-label={`Select ${u.firstName} ${u.lastName}`}
-                                                        />
-                                                        <span className="text-sm text-[var(--text-primary)]">
-                                                            {u.firstName} {u.lastName}
-                                                        </span>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-                                    <button
-                                        onClick={handleCreateGroup}
-                                        className="btn-primary w-full sm:w-auto"
-                                        aria-label="Create group"
-                                    >
-                                        Create Group
-                                    </button>
+                                        ))
+                                    )}
                                 </div>
-                            )}
-
-                            {editGroupId && (
-                                <GroupUsersModal
-                                    editGroupId={editGroupId}
-                                    editGroupName={editGroupName}
-                                    setEditGroupName={setEditGroupName}
-                                    setEditGroupId={setEditGroupId}
-                                    handleEditGroup={handleEditGroup}
-                                    groupUsers={groupUsers}
-                                    handleRemoveUser={handleRemoveUser}
-                                    availableUsers={users}
-                                    handleAddUser={handleAddUser}
-                                    isAdmin={isAdmin(editGroupId)}
-                                    currentUserId={user.id}
-                                />
-                            )}
-
-                            <ConfirmationModal
-                                isOpen={isModalOpen}
-                                onClose={closeModal}
-                                onConfirm={confirmDelete}
-                                title="Confirm Group Deletion"
-                                message="Are you sure you want to delete this group? This action cannot be undone."
-                            />
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </div>
-            </div>
+
+                <GroupUsersModal
+                    editGroupId={editGroupId}
+                    editGroupName={editGroupName}
+                    setEditGroupName={setEditGroupName}
+                    setEditGroupId={setEditGroupId}
+                    handleEditGroup={handleEditGroup}
+                    groupUsers={groupUsers}
+                    handleRemoveUser={handleRemoveUser}
+                    availableUsers={users}
+                    handleAddUser={handleAddUser}
+                    isAdmin={isAdmin(editGroupId)}
+                    currentUserId={Number(user?.id)}
+                />
+
+                <ConfirmationModal
+                    isOpen={isModalOpen}
+                    onClose={() => setIsModalOpen(false)}
+                    onConfirm={confirmDelete}
+                    title="Delete Group"
+                    message="Are you sure you want to delete this group?"
+                />
+            </main>
         </div>
     );
 };
 
 Chatroom.propTypes = {
-    isCollapsed: PropTypes.bool.isRequired,
+    user: PropTypes.shape({
+        id: PropTypes.number,
+        firstName: PropTypes.string,
+        lastName: PropTypes.string,
+        email: PropTypes.string,
+    }),
+    isCollapsed: PropTypes.bool,
     setIsCollapsed: PropTypes.func.isRequired,
-    darkMode: PropTypes.bool.isRequired,
-    setDarkMode: PropTypes.func.isRequired,
-    notifications: PropTypes.arrayOf(
-        PropTypes.shape({
-            id: PropTypes.number.isRequired,
-            message: PropTypes.string.isRequired,
-            date: PropTypes.string.isRequired,
-            read: PropTypes.bool.isRequired,
-        })
-    ).isRequired,
+    darkMode: PropTypes.bool,
+    notifications: PropTypes.array,
+    onActivity: PropTypes.func,
+};
+
+Chatroom.defaultProps = {
+    user: null,
+    isCollapsed: true,
+    darkMode: false,
+    notifications: [],
+    onActivity: undefined,
 };
 
 export default Chatroom;

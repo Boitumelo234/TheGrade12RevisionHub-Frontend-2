@@ -1,19 +1,25 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
+import { Calendar, List, Pencil, Plus, Trash2 } from 'lucide-react';
 import ScheduleForm from './ScheduleForm';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:6262';
 
-const Schedule = ({ schedule: propSchedule, setRecentActivity, isCollapsed, darkMode, recentActivities }) => {
-    const days = ['M', 'T', 'W', 'Th', 'F', 'S', 'Su'];
+const Schedule = ({ schedule: propSchedule, darkMode }) => {
+    const weekDays = [
+        { short: 'M', full: 'Monday' },
+        { short: 'T', full: 'Tuesday' },
+        { short: 'W', full: 'Wednesday' },
+        { short: 'Th', full: 'Thursday' },
+        { short: 'F', full: 'Friday' },
+        { short: 'S', full: 'Saturday' },
+        { short: 'Su', full: 'Sunday' },
+    ];
+
     const [schedule, setSchedule] = useState([]);
     const [selectedDay, setSelectedDay] = useState(() => {
-        const today = new Date();
-        // Get day of week (0=Sunday, 1=Monday, ..., 6=Saturday)
-        const dayIndex = today.getDay();
-        // Map to days array (Monday=0, Sunday=6)
-        const mappedIndex = dayIndex === 0 ? 6 : dayIndex - 1;
-        return days[mappedIndex];
+        const dayIndex = new Date().getDay();
+        return dayIndex === 0 ? 'Su' : weekDays[dayIndex - 1].short;
     });
     const [viewMode, setViewMode] = useState('list');
     const [editingSchedule, setEditingSchedule] = useState(null);
@@ -29,55 +35,58 @@ const Schedule = ({ schedule: propSchedule, setRecentActivity, isCollapsed, dark
         return parts.length >= 2 ? `${parts[0]}:${parts[1]}:${parts[2] || '00'}` : '00:00:00';
     };
 
-    useEffect(() => {
-        const fetchSchedules = async () => {
-            try {
-                setLoading(true);
-                setError('');
-                const token = sessionStorage.getItem('jwt');
-                if (!token) {
-                    throw new Error('No JWT token found');
-                }
-                const response = await fetch(`${API_BASE_URL}/api/user/schedule/get-schedules`, {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                        'Content-Type': 'application/json',
-                    },
-                });
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                const result = await response.json();
-                console.log('Fetched schedules:', result);
-                if (!result.data || !Array.isArray(result.data)) {
-                    throw new Error('Invalid response format');
-                }
-                setSchedule(
-                    result.data.map((item) => ({
-                        id: item.id,
-                        day: item.dayOfWeek,
-                        course: item.subject,
-                        time: `${normalizeTime(item.startTime)}-${normalizeTime(item.endTime)}`,
-                    }))
-                );
-                setLoading(false);
-            } catch (error) {
-                console.error('Error fetching schedules:', error);
-                setError('Failed to load schedules. Using fallback data.');
-                setSchedule(
-                    propSchedule.map((item, index) => ({
-                        id: `fallback-${index}`,
-                        day: item.day,
-                        course: item.course,
-                        time: `${normalizeTime(item.time.split('-')[0])}-${normalizeTime(item.time.split('-')[1])}`,
-                    }))
-                );
-                setLoading(false);
-            }
-        };
+    const mapFallback = useCallback(() => (
+        propSchedule.map((item, index) => ({
+            id: `fallback-${index}`,
+            day: item.day,
+            course: item.course,
+            time: item.time,
+        }))
+    ), [propSchedule]);
 
-        fetchSchedules();
-    }, [propSchedule]);
+    const loadSchedules = useCallback(async () => {
+        try {
+            setLoading(true);
+            setError('');
+            const token = sessionStorage.getItem('jwt');
+            if (!token) {
+                throw new Error('No JWT token found');
+            }
+
+            const response = await fetch(`${API_BASE_URL}/api/user/schedule/get-schedules`, {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const result = await response.json();
+            if (!result.data || !Array.isArray(result.data)) {
+                throw new Error('Invalid response format');
+            }
+
+            setSchedule(result.data.map((item) => ({
+                id: item.id,
+                day: item.dayOfWeek,
+                course: item.subject,
+                time: `${normalizeTime(item.startTime)}-${normalizeTime(item.endTime)}`,
+            })));
+        } catch (fetchError) {
+            console.error('Error fetching schedules:', fetchError);
+            setError('Failed to load schedules. Using fallback data.');
+            setSchedule(mapFallback());
+        } finally {
+            setLoading(false);
+        }
+    }, [mapFallback]);
+
+    useEffect(() => {
+        loadSchedules();
+    }, [loadSchedules]);
 
     const handleCreateOrUpdateSchedule = async (formData) => {
         try {
@@ -87,36 +96,36 @@ const Schedule = ({ schedule: propSchedule, setRecentActivity, isCollapsed, dark
             if (!token) {
                 throw new Error('No JWT token found');
             }
-            const headers = {
-                Authorization: `Bearer ${token}`,
-                'Content-Type': 'application/json',
-            };
-            const url = formData.scheduleId
-                ? `${API_BASE_URL}/api/user/schedule/update-schedule`
-                : `${API_BASE_URL}/api/user/schedule/create-schedule`;
-            const method = formData.scheduleId ? 'PUT' : 'POST';
 
-            const response = await fetch(url, {
-                method,
-                headers,
-                body: JSON.stringify({
-                    scheduleId: formData.scheduleId,
-                    subject: formData.subject,
-                    dayOfWeek: formData.dayOfWeek,
-                    startTime: formData.startTime,
-                    endTime: formData.endTime,
-                }),
-            });
+            const response = await fetch(
+                formData.scheduleId
+                    ? `${API_BASE_URL}/api/user/schedule/update-schedule`
+                    : `${API_BASE_URL}/api/user/schedule/create-schedule`,
+                {
+                    method: formData.scheduleId ? 'PUT' : 'POST',
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        scheduleId: formData.scheduleId,
+                        subject: formData.subject,
+                        dayOfWeek: formData.dayOfWeek,
+                        startTime: formData.startTime,
+                        endTime: formData.endTime,
+                    }),
+                }
+            );
 
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
 
             const result = await response.json();
-            console.log('Saved schedule:', result);
             if (!result.data) {
                 throw new Error('Invalid response format');
             }
+
             const newSchedule = {
                 id: result.data.id,
                 day: result.data.dayOfWeek,
@@ -124,22 +133,15 @@ const Schedule = ({ schedule: propSchedule, setRecentActivity, isCollapsed, dark
                 time: `${normalizeTime(result.data.startTime)}-${normalizeTime(result.data.endTime)}`,
             };
 
-            if (formData.scheduleId) {
-                setSchedule(
-                    schedule.map((item) =>
-                        item.id === formData.scheduleId ? newSchedule : item
-                    )
-                );
-            } else {
-                setSchedule([...schedule, newSchedule]);
-            }
-
-
-
+            setSchedule((current) => (
+                formData.scheduleId
+                    ? current.map((item) => (item.id === formData.scheduleId ? newSchedule : item))
+                    : [...current, newSchedule]
+            ));
             setEditingSchedule(null);
             setShowForm(false);
-        } catch (error) {
-            console.error('Error saving schedule:', error);
+        } catch (saveError) {
+            console.error('Error saving schedule:', saveError);
             setOperationError('Failed to save schedule. Please try again.');
         } finally {
             setOperationLoading(false);
@@ -166,6 +168,7 @@ const Schedule = ({ schedule: propSchedule, setRecentActivity, isCollapsed, dark
             if (!token) {
                 throw new Error('No JWT token found');
             }
+
             const response = await fetch(`${API_BASE_URL}/api/user/schedule/delete-schedule/${scheduleId}`, {
                 method: 'DELETE',
                 headers: {
@@ -177,233 +180,143 @@ const Schedule = ({ schedule: propSchedule, setRecentActivity, isCollapsed, dark
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
 
-            console.log(`Deleted schedule ID: ${scheduleId}`);
-            //const deletedSchedule = schedule.find((item) => item.id === scheduleId);
-            setSchedule(schedule.filter((item) => item.id !== scheduleId));
-
-        } catch (error) {
-            console.error('Error deleting schedule:', error);
+            setSchedule((current) => current.filter((item) => item.id !== scheduleId));
+        } catch (deleteError) {
+            console.error('Error deleting schedule:', deleteError);
             setOperationError('Failed to delete schedule. Please try again.');
         } finally {
             setOperationLoading(false);
         }
     };
 
-    const handleCancel = () => {
-        setEditingSchedule(null);
-        setShowForm(false);
-        setOperationError('');
-    };
-
-    const handleRetry = () => {
-        setLoading(true);
-        setError('');
-        const fetchSchedules = async () => {
-            try {
-                setLoading(true);
-                setError('');
-                const token = sessionStorage.getItem('jwt');
-                if (!token) {
-                    throw new Error('No JWT token found');
-                }
-                const response = await fetch(`${API_BASE_URL}/api/user/schedule/get-schedules`, {
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                        'Content-Type': 'application/json',
-                    },
-                });
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                const result = await response.json();
-                console.log('Fetched schedules:', result);
-                if (!result.data || !Array.isArray(result.data)) {
-                    throw new Error('Invalid response format');
-                }
-                setSchedule(
-                    result.data.map((item) => ({
-                        id: item.id,
-                        day: item.dayOfWeek,
-                        course: item.subject,
-                        time: `${normalizeTime(item.startTime)}-${normalizeTime(item.endTime)}`,
-                    }))
-                );
-                setLoading(false);
-            } catch (error) {
-                console.error('Error fetching schedules:', error);
-                setError('Failed to load schedules. Using fallback data.');
-                setSchedule(
-                    propSchedule.map((item, index) => ({
-                        id: `fallback-${index}`,
-                        day: item.day,
-                        course: item.course,
-                        time: `${normalizeTime(item.time.split('-')[0])}-${normalizeTime(item.time.split('-')[1])}`,
-                    }))
-                );
-                setLoading(false);
-            }
-        };
-        fetchSchedules();
-    };
-
-    const handleOperationRetry = () => {
-        setOperationError('');
-        setOperationLoading(false);
-    };
+    const filteredSchedule = schedule.filter((item) => item.day === selectedDay);
 
     if (loading) {
         return (
-            <div
-                className={`
-          p-6 rounded-2xl shadow-2xl
-          ${darkMode ? 'bg-gray-800' : 'bg-teal-800 bg-opacity-90 backdrop-blur-md'}
-        `}
-            >
-                <div className="animate-pulse text-gray-300">Loading schedules...</div>
-            </div>
+            <section className={`rounded-2xl border p-6 shadow-sm ${darkMode ? 'border-gray-700 bg-gray-800' : 'border-[color:rgba(237,237,238,0.9)] bg-white'}`}>
+                <div className="animate-pulse text-[var(--text-secondary)]">Loading schedules...</div>
+            </section>
         );
     }
 
     return (
-        <div
-            className="bg-[var(--bg-secondary)] bg-opacity-90 backdrop-blur-md p-6 rounded-2xl shadow-2xl "
-            aria-label="Schedule component"
-        >
-            <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-semibold mb-4 text-[var(--text-primary)]">Schedule</h2>
+        <div className="rounded-2xl border border-[color:rgba(237,237,238,0.9)] bg-[var(--bg-secondary)] p-6 shadow-sm">
+            <div className="mb-4 flex items-center justify-between">
+                <div>
+                    <div className="mb-1 flex items-center gap-2">
+                        <Calendar className="h-5 w-5 text-[var(--accent-secondary)]" />
+                        <span className="font-semibold text-[var(--text-primary)]">Schedule</span>
+                    </div>
+                    <p className="text-sm text-[var(--text-secondary)]">Plan, review and adjust your study slots.</p>
+                </div>
                 <button
                     onClick={() => setShowForm(true)}
                     disabled={operationLoading}
-                    className={`
-          px-4 py-2 rounded-lg text-[var(--text-primary)] bg-[var(--accent-primary)]
-          hover:bg-[var(--hover-primary)]
-          ${operationLoading ? 'opacity-50 cursor-not-allowed' : ''}
-        `}
+                    className={`rounded-xl bg-[var(--accent-primary)] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[var(--hover-primary)] ${operationLoading ? 'cursor-not-allowed opacity-50' : ''}`}
                 >
+                    <Plus className="mr-1 inline h-4 w-4" />
                     Add Schedule
                 </button>
             </div>
 
-            {/* Error messages */}
             {error && (
-                <div className="mb-4 p-3 bg-[var(--accent-secondary)] text-[var(--text-primary)] rounded-lg flex justify-between items-center" role="alert">
+                <div className="mb-4 flex items-center justify-between rounded-xl bg-red-50 p-3 text-sm text-red-700">
                     <span>{error}</span>
-                    <button
-                        onClick={handleRetry}
-                        className="px-3 py-1 bg-[var(--accent-secondary)] hover:bg-[var(--hover-secondary)] rounded"
-                        aria-label="Retry loading schedules"
-                    >
-                        Retry
-                    </button>
-                </div>
-            )}
-            {operationError && (
-                <div className="mb-4 p-3 bg-[var(--accent-secondary)] text-[var(--text-primary)] rounded-lg flex justify-between items-center" role="alert">
-                    <span>{operationError}</span>
-                    <button
-                        onClick={handleOperationRetry}
-                        className="px-3 py-1 bg-[var(--accent-secondary)] hover:bg-[var(--hover-secondary)] rounded"
-                        aria-label="Retry operation"
-                    >
+                    <button onClick={loadSchedules} className="rounded-lg border border-red-200 bg-white px-3 py-1">
                         Retry
                     </button>
                 </div>
             )}
 
-            {/* Schedule Form */}
+            {operationError && (
+                <div className="mb-4 flex items-center justify-between rounded-xl bg-red-50 p-3 text-sm text-red-700">
+                    <span>{operationError}</span>
+                    <button onClick={() => setOperationError('')} className="rounded-lg border border-red-200 bg-white px-3 py-1">
+                        Close
+                    </button>
+                </div>
+            )}
+
             {showForm && (
                 <ScheduleForm
                     onSubmit={handleCreateOrUpdateSchedule}
                     initialData={editingSchedule}
-                    onCancel={handleCancel}
+                    onCancel={() => {
+                        setEditingSchedule(null);
+                        setShowForm(false);
+                        setOperationError('');
+                    }}
                     darkMode={darkMode}
                 />
             )}
 
-            {/* Day Buttons & View Toggle */}
-            <div className="flex justify-between items-center mb-4 flex-col sm:flex-row gap-2">
-                <div className="flex flex-wrap gap-2">
-                    {days.map((day) => (
-                        <button
-                            key={day}
-                            className={`
-              px-3 py-1 rounded text-sm
-              ${
-                                selectedDay === day
-                                    ? 'bg-[var(--accent-primary)] text-[var(--text-primary)]'
-                                    : 'bg-[var(--bg-tertiary)] hover:bg-[var(--hover-primary)] text-[var(--text-primary)]'
-                            }
-            `}
-                            onClick={() => setSelectedDay(day)}
-                            aria-label={`Select ${{
-                                M: 'Monday',
-                                T: 'Tuesday',
-                                W: 'Wednesday',
-                                Th: 'Thursday',
-                                F: 'Friday',
-                                S: 'Saturday',
-                                Su: 'Sunday',
-                            }[day]}`}
-                        >
-                            {day}
-                        </button>
-                    ))}
-                </div>
-                <button
-                    onClick={() => setViewMode(viewMode === 'list' ? 'calendar' : 'list')}
-                    className="
-          px-4 py-2 rounded-lg text-[var(--text-primary)]
-          bg-[var(--accent-primary)] hover:bg-[var(--hover-primary)]
-        "
-                    aria-label={`Switch to ${viewMode === 'list' ? 'calendar' : 'list'} view`}
-                >
-                    {viewMode === 'list' ? 'Calendar View' : 'List View'}
-                </button>
+            <div className="mb-4 flex gap-2">
+                {weekDays.map((day) => (
+                    <button
+                        key={day.short}
+                        onClick={() => setSelectedDay(day.short)}
+                        className={`h-10 w-10 rounded-xl text-sm font-medium transition-all ${
+                            selectedDay === day.short
+                                ? 'bg-[var(--accent-primary)] text-white'
+                                : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[color:rgba(229,231,235,0.9)]'
+                        }`}
+                    >
+                        {day.short}
+                    </button>
+                ))}
             </div>
 
-            {/* Schedule List */}
+            <button
+                onClick={() => setViewMode(viewMode === 'list' ? 'calendar' : 'list')}
+                className="mb-4 inline-flex w-fit items-center rounded-xl border border-[color:rgba(237,237,238,0.9)] bg-[var(--bg-secondary)] px-3 py-2 text-sm font-medium text-[var(--text-primary)]"
+            >
+                <List className="mr-1 h-4 w-4" />
+                {viewMode === 'list' ? 'List View' : 'Calendar View'}
+            </button>
+
             {viewMode === 'list' ? (
-                <div className="space-y-2">
-                    {schedule.filter((item) => item.day === selectedDay).map((item) => (
-                        <div
-                            key={item.id}
-                            className="
-              flex items-center justify-between p-3 rounded transition
-              bg-[var(--bg-primary)] hover:bg-[var(--hover-primary)]
-            "
-                        >
-                            <span className="font-medium text-[var(--text-primary)]">{item.course}</span>
-                            <div className="flex items-center space-x-2">
-                                <span className="text-[var(--text-secondary)] text-sm">{item.time}</span>
-                                <button
-                                    onClick={() => handleEditSchedule(item)}
-                                    className="text-[var(--accent-primary)] hover:text-[var(--hover-primary)]"
-                                    aria-label={`Edit ${item.course} schedule`}
-                                    disabled={operationLoading}
-                                >
-                                    ✏️
-                                </button>
-                                <button
-                                    onClick={() => handleDeleteSchedule(item.id)}
-                                    className="text-[var(--accent-secondary)] hover:text-[var(--hover-secondary)]"
-                                    aria-label={`Delete ${item.course} schedule`}
-                                    disabled={operationLoading}
-                                >
-                                    🗑️
-                                </button>
+                filteredSchedule.length > 0 ? (
+                    <div className="space-y-3">
+                        {filteredSchedule.map((item) => (
+                            <div
+                                key={item.id}
+                                className="flex items-center justify-between gap-4 rounded-2xl border border-[color:rgba(237,237,238,0.9)] bg-[color:rgba(243,244,246,0.35)] p-4"
+                            >
+                                <div>
+                                    <p className="font-semibold text-[var(--text-primary)]">{item.course}</p>
+                                    <p className="mt-1 text-sm text-[var(--text-secondary)]">{item.time}</p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => handleEditSchedule(item)}
+                                        className="rounded-lg p-2 text-[var(--accent-primary)] transition-colors hover:bg-[color:rgba(22,163,74,0.08)]"
+                                        disabled={operationLoading}
+                                    >
+                                        <Pencil size={16} />
+                                    </button>
+                                    <button
+                                        onClick={() => handleDeleteSchedule(item.id)}
+                                        className="rounded-lg p-2 text-red-500 transition-colors hover:bg-red-50"
+                                        disabled={operationLoading}
+                                    >
+                                        <Trash2 size={16} />
+                                    </button>
+                                </div>
                             </div>
-                        </div>
-                    ))}
-                    {schedule.filter((item) => item.day === selectedDay).length === 0 && (
-                        <p className="text-[var(--text-secondary)]">No schedule for this day.</p>
-                    )}
-                </div>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="flex h-32 items-center justify-center rounded-xl bg-[color:rgba(243,244,246,0.5)]">
+                        <p className="text-sm text-[var(--text-secondary)]">No schedule for this day.</p>
+                    </div>
+                )
             ) : (
-                <div className="text-[var(--text-secondary)]">Calendar view coming soon!</div>
+                <div className="flex h-32 items-center justify-center rounded-xl bg-[color:rgba(243,244,246,0.5)]">
+                    <p className="text-sm text-[var(--text-secondary)]">Calendar view coming soon!</p>
+                </div>
             )}
         </div>
     );
-
 };
 
 Schedule.propTypes = {
@@ -414,16 +327,7 @@ Schedule.propTypes = {
             time: PropTypes.string.isRequired,
         })
     ).isRequired,
-    setRecentActivity: PropTypes.func.isRequired,
-    isCollapsed: PropTypes.bool.isRequired,
     darkMode: PropTypes.bool.isRequired,
-    recentActivities: PropTypes.arrayOf(
-        PropTypes.shape({
-            id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
-            description: PropTypes.string.isRequired,
-            date: PropTypes.string.isRequired,
-        })
-    ).isRequired,
 };
 
 export default Schedule;

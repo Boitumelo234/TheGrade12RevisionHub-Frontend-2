@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import { Quote } from 'lucide-react';
 
 const MotivationalQuote = () => {
     const quotes = [
@@ -7,43 +8,32 @@ const MotivationalQuote = () => {
         { text: 'Success is not final, failure is not fatal: It is the courage to continue that counts.', author: 'Winston Churchill' },
         { text: 'You are never too old to set another goal or to dream a new dream.', author: 'C.S. Lewis' },
         { text: 'The only way to do great work is to love what you do.', author: 'Steve Jobs' },
-        { text: 'It always seems impossible until it’s done.', author: 'Nelson Mandela' },
+        { text: 'It always seems impossible until it\'s done.', author: 'Nelson Mandela' },
         { text: 'The only limit to our realization of tomorrow will be our doubts of today.', author: 'Franklin D. Roosevelt' },
         { text: 'Do what you can, with what you have, where you are.', author: 'Theodore Roosevelt' },
-        { text: 'Believe you can and you’re halfway there.', author: 'Theodore Roosevelt' },
-        { text: 'Your time is limited, don’t waste it living someone else’s life.', author: 'Steve Jobs' },
+        { text: 'Believe you can and you\'re halfway there.', author: 'Theodore Roosevelt' },
+        { text: 'Your time is limited, don\'t waste it living someone else\'s life.', author: 'Steve Jobs' },
         { text: 'The best way to predict the future is to create it.', author: 'Peter Drucker' },
         { text: 'What you do today can improve all your tomorrows.', author: 'Ralph Marston' },
         { text: 'Give yourself a task', author: 'Shupe Mphofela' },
         { text: 'Perfection is not attainable, but if we chase perfection we might as well catch excellence.', author: 'Vince Lombardi' },
-
     ];
 
     const [currentQuoteIndex, setCurrentQuoteIndex] = useState(0);
 
     useEffect(() => {
-        // Get today's date as a string (YYYY-MM-DD) to use as a key
         const today = new Date().toISOString().split('T')[0];
-
-        // Check local storage for the quote index and date
         const storedDate = localStorage.getItem('quoteDate');
-        let storedIndex = localStorage.getItem('quoteIndex');
+        const storedIndex = localStorage.getItem('quoteIndex');
 
         if (storedDate === today && storedIndex !== null) {
-            // If the stored date is today, use the stored quote index
             setCurrentQuoteIndex(parseInt(storedIndex, 10));
         } else {
-            // Generate a new index based on the current date
             const date = new Date();
-            const dayOfYear = Math.floor(
-                (date - new Date(date.getFullYear(), 0, 0)) / (1000 * 60 * 60 * 24)
-            );
+            const dayOfYear = Math.floor((date - new Date(date.getFullYear(), 0, 0)) / (1000 * 60 * 60 * 24));
             const newIndex = dayOfYear % quotes.length;
-
-            // Store the new index and date in local storage
             localStorage.setItem('quoteIndex', newIndex);
             localStorage.setItem('quoteDate', today);
-
             setCurrentQuoteIndex(newIndex);
         }
     }, [quotes.length]);
@@ -56,11 +46,17 @@ const MotivationalQuote = () => {
     });
 
     return (
-        <div className="bg-[var(--bg-secondary)] bg-opacity-90 backdrop-blur-md p-6 rounded-2xl shadow-2xl text-center ">
-            <h1 className="text-lg font-semibold text-[var(--text-normal)]">Daily Quote</h1>
-            <span className="text-sm mt-2 text-[var(--text-normal)]">{currentDate}</span>
-            <p className="text-lg font-semibold text-[var(--text-normal)] mt-10">"{quotes[currentQuoteIndex].text}"</p>
-            <p className="text-sm mt-2 text-[var(--text-normal)]">— {quotes[currentQuoteIndex].author}</p>
+        <div className="rounded-2xl border border-[color:rgba(237,237,238,0.9)] bg-[var(--bg-secondary)] p-6 shadow-sm">
+            <div className="mb-2 flex items-center gap-2">
+                <Quote className="h-5 w-5 text-[var(--accent-primary)]" />
+                <span className="font-semibold text-[var(--accent-primary)]">Daily Quote</span>
+            </div>
+            <p className="mb-6 text-xs text-[var(--text-secondary)]">{currentDate}</p>
+
+            <div className="py-4 text-center">
+                <p className="text-lg font-medium italic leading-relaxed text-[var(--text-primary)]">"{quotes[currentQuoteIndex].text}"</p>
+                <p className="mt-4 text-sm text-[var(--text-secondary)]">{'\u2014'} {quotes[currentQuoteIndex].author}</p>
+            </div>
         </div>
     );
 };

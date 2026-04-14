@@ -13,8 +13,9 @@ const  MathLitP22024 = ({ paper, onBack }) => {
     const [results, setResults] = useState(null)
 
     const { startTimer, isTimeUp, resetTimer } = useTimer()
+    const getPaperData = () => paper2_2024
 
-    const paperData = getPaperData(paper.year, paper.paper)
+    const paperData = getPaperData(paper?.year, paper?.paper)
 
     // Start timer when paper loads
     useEffect(() => {

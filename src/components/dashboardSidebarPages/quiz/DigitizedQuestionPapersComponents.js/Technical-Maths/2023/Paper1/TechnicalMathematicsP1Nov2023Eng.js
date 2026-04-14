@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from 'react-router-dom';
+import { API_BASE_URL, getAuthHeaders } from '../../../../../../../utils/api';
 
 const TechnicalMathematicsP1Nov2023Eng = ({ paperId }) => {
     const navigate = useNavigate();
